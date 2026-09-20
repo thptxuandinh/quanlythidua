@@ -599,13 +599,14 @@ async function loadClassSchedule() {
       <tr>
         <td class="bold center">${escapeHtml(x.LOP)}</td>
         <td class="center">
-          <span style="display:inline-block;padding:4px 8px;border-radius:4px;font-weight:bold;font-size:12px;background:${x.CA==='SANG'?'#dbeafe':'#fee2e2'};color:${x.CA==='SANG'?'#1e40af':'#991b1b'}">
+          <span style="display:inline-block;padding:4px 8px;border-radius:4px;font-weight:bold;font-size:12px;background:${x.CA==='SANG'?'#dbeafe':(x.CA==='CHIEU'?'#fee2e2':'#f1f5f9')};color:${x.CA==='SANG'?'#1e40af':(x.CA==='CHIEU'?'#991b1b':'#475569')}">
             ${x.CA === 'SANG' ? 'Sáng' : (x.CA === 'CHIEU' ? 'Chiều' : 'Chưa xếp')}
           </span>
         </td>
         <td class="center">
           <button class="btn-primary" style="padding:4px 10px;font-size:12px;margin-right:4px;" onclick="saveClassSchedule('${escapeHtml(x.LOP)}', 'SANG')">Gán Sáng</button>
-          <button class="btn-danger" style="padding:4px 10px;font-size:12px;background:#f97316;" onclick="saveClassSchedule('${escapeHtml(x.LOP)}', 'CHIEU')">Gán Chiều</button>
+          <button class="btn-danger" style="padding:4px 10px;font-size:12px;background:#f97316;margin-right:4px;" onclick="saveClassSchedule('${escapeHtml(x.LOP)}', 'CHIEU')">Gán Chiều</button>
+          ${x.CA ? `<button style="padding:4px 10px;font-size:12px;background:#94a3b8;color:white;border:none;border-radius:4px;cursor:pointer;" onclick="saveClassSchedule('${escapeHtml(x.LOP)}', '')">Hủy ca</button>` : ''}
         </td>
       </tr>
     `).join('');
