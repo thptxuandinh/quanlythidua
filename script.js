@@ -181,6 +181,7 @@ async function openPage(page, el){
   if(page==='student') return renderStudentPage();
   if(page==='rank') return renderRankPage();
   if(page==='week') return renderWeekPage();
+  if(page==='classSchedule') return renderClassSchedulePage();
   if(page==='export') return renderExportPage();
   if(page==='admin') return renderAdminPage();
   if(page==='score') return renderScorePage();
@@ -570,39 +571,120 @@ async function renderAdminPage(){
     await safeTask(async()=>{ const res = await gs('themLoiViPham', payload); showToast(res.message || 'Đã thêm lỗi'); ['adminMaLoi','adminNhomLoi','adminTenLoi','adminDiemTru','adminMoTa'].forEach(id=>document.getElementById(id).value=''); document.getElementById('adminDonVi').value='Lần'; });
   }
 
+async function renderClassSchedulePage() {
+  document.getElementById('app').innerHTML = `
+  <div class="card">
+    <div class="card-title">📋 Sắp xếp lớp theo ca</div>
+    <p>Gán các lớp vào ca Sáng hoặc Chiều để dễ dàng quản lý nhập điểm.</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Lớp</th>
+            <th>Ca hiện tại</th>
+            <th>Thao tác</th>
+          </tr>
+        </thead>
+        <tbody id="classScheduleTable"></tbody>
+      </table>
+    </div>
+  </div>`;
+  loadClassSchedule();
+}
+
+async function loadClassSchedule() {
+  await safeTask(async () => {
+    const list = await gs('getDanhSachSapXep');
+    document.getElementById('classScheduleTable').innerHTML = list.map(x => `
+      <tr>
+        <td class="bold center">${escapeHtml(x.LOP)}</td>
+        <td class="center">
+          <span style="display:inline-block;padding:4px 8px;border-radius:4px;font-weight:bold;font-size:12px;background:${x.CA==='SANG'?'#dbeafe':'#fee2e2'};color:${x.CA==='SANG'?'#1e40af':'#991b1b'}">
+            ${x.CA === 'SANG' ? 'Sáng' : (x.CA === 'CHIEU' ? 'Chiều' : 'Chưa xếp')}
+          </span>
+        </td>
+        <td class="center">
+          <button class="btn-primary" style="padding:4px 10px;font-size:12px;margin-right:4px;" onclick="saveClassSchedule('${escapeHtml(x.LOP)}', 'SANG')">Gán Sáng</button>
+          <button class="btn-danger" style="padding:4px 10px;font-size:12px;background:#f97316;" onclick="saveClassSchedule('${escapeHtml(x.LOP)}', 'CHIEU')">Gán Chiều</button>
+        </td>
+      </tr>
+    `).join('');
+  });
+}
+
+async function saveClassSchedule(lop, ca) {
+  await safeTask(async () => {
+    const res = await gs('saveSapXepLop', lop, ca);
+    showToast(res.message);
+    await loadClassSchedule();
+  });
+}
 
 async function renderScorePage(){
   document.getElementById('app').innerHTML=`
   <div class="card">
-  <div class="card-title">📚 Nhập điểm học tập - Tự động tính thi đua</div>
-  <p>Giáo viên nhập các đầu điểm học tập (Theo quy chế mới). Điểm nề nếp và SHTT được hệ thống tự động tính.</p>
-  <div class="grid-2">
-  <select id="sTuan" onchange="previewNNSHTT(); loadRankingTable(this.value)"><option value="">-- Chọn tuần --</option></select>
-  <select id="sLop" onchange="previewNNSHTT()"><option value="">-- Chọn lớp --</option></select>
-  <input id="previewNN" placeholder="Điểm Nề nếp (hệ thống tính)" readonly style="background:#f8fafc;color:#047857;font-weight:bold;border:1px dashed #cbd5e1;">
-    <input id="previewSHTT" placeholder="Điểm SHTT (hệ thống tính)" readonly style="background:#f8fafc;color:#047857;font-weight:bold;border:1px dashed #cbd5e1;">
-    <input id="sDHT" placeholder="Nhập Điểm Học Tập">
-    <input id="sTDT" placeholder="Nhập Điểm Thi Đua">
-  </div>
-  <button class="btn-primary" style="margin-top:14px" onclick="saveScoreV123()">Tính ĐHT & Xếp hạng</button>
-  <button class="btn-danger" style="margin-top:14px;margin-left:8px" onclick="deleteScoreV123()">Xóa điểm học tập</button>
-  </div>
-  <div class="card">
-  <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
-    <span>🏆 Kết quả xếp hạng</span>
-    <div style="display:flex;gap:8px">
-      <select id="sKhoiFilter" style="width:150px;min-height:36px;padding:6px;border-radius:8px" onchange="renderRankTable()">
-        <option value="">Tất cả khối</option>
-        <option value="10">Khối 10</option>
-        <option value="11">Khối 11</option>
-        <option value="12">Khối 12</option>
-      </select>
-      <button class="btn-primary" style="padding:6px 16px;min-height:36px" onclick="exportRankExcel()">Xuất Excel</button>
+    <div class="card-title">📚 Quản lý điểm - Nhập điểm ngày</div>
+    <div class="grid-2">
+      <select id="sCa" onchange="loadLopTheoCaUI()"><option value="">-- Chọn ca --</option><option value="SANG">Ca Sáng</option><option value="CHIEU">Ca Chiều</option></select>
+      <select id="sLop" onchange="loadDiemNgayTable(); previewNNSHTT()"><option value="">-- Chọn lớp --</option></select>
+    </div>
+    
+    <div id="diemNgayWrap" style="margin-top:16px; display:none; padding:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;">
+      <div class="sub-title" style="margin-bottom:12px;">📝 Nhập điểm ngày (Học tốt, Chuyên cần...)</div>
+      <div class="grid-2">
+        <div><label>Ngày</label><input type="date" id="sNgay" onchange="loadDiemNgayTable()"></div>
+        <div></div>
+        <div><label>Học tốt</label><input type="number" id="sHocTot" placeholder="Nhập điểm số"></div>
+        <div><label>Chuyên cần</label><input type="number" id="sChuyenCan" placeholder="Nhập điểm số"></div>
+        <div><label>Điểm tốt</label><input type="number" id="sDiemTot" placeholder="Nhập điểm số"></div>
+        <div><label>Điểm xấu</label><input type="number" id="sDiemXau" placeholder="Nhập điểm số"></div>
+      </div>
+      <button class="btn-primary" style="margin-top:14px" onclick="saveDiemNgayFE()">Lưu điểm ngày</button>
+      
+      <div style="margin-top:20px;">
+        <h4 style="margin-bottom:8px;">📊 Dữ liệu điểm các ngày trong tuần</h4>
+        <div id="tableDiemNgay"></div>
+      </div>
     </div>
   </div>
-  <div id="scoreRank"></div>
+
+  <div class="card">
+    <div class="card-title">🏆 Tổng kết tuần & Xếp hạng</div>
+    <div class="grid-2">
+      <select id="sTuan" onchange="previewNNSHTT(); loadRankingTable(this.value); loadDiemNgayTable()"><option value="">-- Chọn tuần --</option></select>
+      <div></div>
+      <input id="previewNN" placeholder="Điểm Nề nếp (hệ thống tính)" readonly style="background:#f8fafc;color:#047857;font-weight:bold;border:1px dashed #cbd5e1;">
+      <input id="previewSHTT" placeholder="Điểm SHTT (hệ thống tính)" readonly style="background:#f8fafc;color:#047857;font-weight:bold;border:1px dashed #cbd5e1;">
+      <input id="sDHT" placeholder="Nhập Điểm Học Tập (Tổng kết)">
+      <input id="sTDT" placeholder="Nhập Điểm Thi Đua (Tổng kết)">
+    </div>
+    <button class="btn-primary" style="margin-top:14px" onclick="saveScoreV123()">Lưu tổng kết & Xếp hạng</button>
+    <button class="btn-danger" style="margin-top:14px;margin-left:8px" onclick="deleteScoreV123()">Xóa tổng kết</button>
+  </div>
+  
+  <div class="card">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+      <span>Kết quả xếp hạng tuần</span>
+      <div style="display:flex;gap:8px">
+        <select id="sKhoiFilter" style="width:150px;min-height:36px;padding:6px;border-radius:8px" onchange="renderRankTable()">
+          <option value="">Tất cả khối</option>
+          <option value="10">Khối 10</option>
+          <option value="11">Khối 11</option>
+          <option value="12">Khối 12</option>
+        </select>
+        <button class="btn-primary" style="padding:6px 16px;min-height:36px" onclick="exportRankExcel()">Xuất Excel</button>
+      </div>
+    </div>
+    <div id="scoreRank"></div>
   </div>`;
   loadScoreDropdownV1258();
+  
+  // Set default date to today
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  document.getElementById('sNgay').value = `${yyyy}-${mm}-${dd}`;
 }
 
 async function loadRankingTable(tuan) {
@@ -661,6 +743,105 @@ function exportRankExcel() {
   document.body.appendChild(link); link.click(); document.body.removeChild(link);
 }
 
+// ================= DIEM NGAY LOGIC =================
+
+async function loadLopTheoCaUI() {
+  const ca = document.getElementById('sCa').value;
+  const wrap = document.getElementById('diemNgayWrap');
+  if (!ca) {
+    document.getElementById('sLop').innerHTML = '<option value="">-- Chọn lớp --</option>';
+    wrap.style.display = 'none';
+    return;
+  }
+  await safeTask(async () => {
+    const lops = await gs('getLopTheoCa', ca);
+    document.getElementById('sLop').innerHTML = '<option value="">-- Chọn lớp --</option>' + 
+      lops.map(x => `<option>${x}</option>`).join('');
+    wrap.style.display = 'block';
+  });
+}
+
+async function saveDiemNgayFE() {
+  const lop = document.getElementById('sLop').value;
+  const ngay = document.getElementById('sNgay').value;
+  if (!lop) return showToast('Vui lòng chọn lớp', 'error');
+  if (!ngay) return showToast('Vui lòng chọn ngày', 'error');
+
+  const data = {
+    LOP: lop,
+    NGAY: ngay,
+    HOC_TOT: document.getElementById('sHocTot').value || 0,
+    CHUYEN_CAN: document.getElementById('sChuyenCan').value || 0,
+    DIEM_TOT: document.getElementById('sDiemTot').value || 0,
+    DIEM_XAU: document.getElementById('sDiemXau').value || 0,
+    NGUOI_NHAP: window.currentUser ? window.currentUser.USERNAME : ''
+  };
+
+  await safeTask(async () => {
+    const res = await gs('saveDiemNgay', data);
+    showToast(res.message);
+    document.getElementById('sHocTot').value = '';
+    document.getElementById('sChuyenCan').value = '';
+    document.getElementById('sDiemTot').value = '';
+    document.getElementById('sDiemXau').value = '';
+    await loadDiemNgayTable();
+  });
+}
+
+async function loadDiemNgayTable() {
+  const lop = document.getElementById('sLop').value;
+  const tuan = document.getElementById('sTuan').value;
+  if (!lop) {
+    document.getElementById('tableDiemNgay').innerHTML = '<div style="color:#64748b">Vui lòng chọn lớp.</div>';
+    return;
+  }
+  
+  await safeTask(async () => {
+    // Nếu có chọn tuần, có thể tính khoảng ngày của tuần đó. Ở đây lấy theo tháng hoặc tuần tùy ý, nhưng để nhanh ta lấy tất cả của lớp đó rồi render.
+    let tuNgay = '';
+    let denNgay = '';
+    if (tuan) {
+       const khoang = await gs('getKhoangTuan', tuan);
+       if (khoang) { tuNgay = khoang.tuNgay; denNgay = khoang.denNgay; }
+    }
+    const diemList = await gs('getDiemNgay', lop, tuNgay, denNgay);
+    
+    if (!diemList || diemList.length === 0) {
+      document.getElementById('tableDiemNgay').innerHTML = '<div style="color:#64748b">Chưa có dữ liệu điểm ngày.</div>';
+      return;
+    }
+    
+    // Sort by Date descending
+    diemList.sort((a,b) => new Date(b.NGAY) - new Date(a.NGAY));
+
+    document.getElementById('tableDiemNgay').innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Ngày</th>
+              <th>Học tốt</th>
+              <th>Chuyên cần</th>
+              <th>Điểm tốt</th>
+              <th>Điểm xấu</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${diemList.map(x => `
+              <tr>
+                <td class="center">${x.NGAY}</td>
+                <td class="right">${x.HOC_TOT}</td>
+                <td class="right">${x.CHUYEN_CAN}</td>
+                <td class="right">${x.DIEM_TOT}</td>
+                <td class="right">${x.DIEM_XAU}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  });
+}
 
 async function loadScoreDropdownV1258(){
   await safeTask(async()=>{
