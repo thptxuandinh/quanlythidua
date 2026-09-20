@@ -624,36 +624,33 @@ async function saveClassSchedule(lop, ca) {
 async function renderScorePage(){
   document.getElementById('app').innerHTML=`
   <div class="card">
-    <div class="card-title">📚 Quản lý điểm - Nhập điểm ngày</div>
+    <div class="card-title">📚 Quản lý điểm - Nhập điểm tiêu chí tuần</div>
     <div class="grid-2">
+      <select id="sTuan" onchange="previewNNSHTT(); loadRankingTable(this.value); loadDiemTieuChiTable()"><option value="">-- Chọn tuần --</option></select>
       <select id="sCa" onchange="loadLopTheoCaUI()"><option value="">-- Chọn ca --</option><option value="SANG">Ca Sáng</option><option value="CHIEU">Ca Chiều</option></select>
-      <select id="sLop" onchange="loadDiemNgayTable(); previewNNSHTT()"><option value="">-- Chọn lớp --</option></select>
+      <select id="sLop" onchange="loadDiemTieuChiTable(); previewNNSHTT()"><option value="">-- Chọn lớp --</option></select>
     </div>
     
     <div id="diemNgayWrap" style="margin-top:16px; display:none; padding:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;">
-      <div class="sub-title" style="margin-bottom:12px;">📝 Nhập điểm ngày (Học tốt, Chuyên cần...)</div>
+      <div class="sub-title" style="margin-bottom:12px;">📝 Nhập điểm tiêu chí tuần (Học tốt, Chuyên cần...)</div>
       <div class="grid-2">
-        <div><label>Ngày</label><input type="date" id="sNgay" onchange="loadDiemNgayTable()"></div>
-        <div></div>
         <div><label>Học tốt</label><input type="number" id="sHocTot" placeholder="Nhập điểm số"></div>
         <div><label>Chuyên cần</label><input type="number" id="sChuyenCan" placeholder="Nhập điểm số"></div>
         <div><label>Điểm tốt</label><input type="number" id="sDiemTot" placeholder="Nhập điểm số"></div>
         <div><label>Điểm xấu</label><input type="number" id="sDiemXau" placeholder="Nhập điểm số"></div>
       </div>
-      <button class="btn-primary" style="margin-top:14px" onclick="saveDiemNgayFE()">Lưu điểm ngày</button>
+      <button class="btn-primary" style="margin-top:14px" onclick="saveDiemTieuChiFE()">Lưu điểm tiêu chí tuần</button>
       
       <div style="margin-top:20px;">
-        <h4 style="margin-bottom:8px;">📊 Dữ liệu điểm các ngày trong tuần</h4>
+        <h4 style="margin-bottom:8px;">📊 Dữ liệu điểm tiêu chí các tuần</h4>
         <div id="tableDiemNgay"></div>
       </div>
     </div>
   </div>
 
   <div class="card">
-    <div class="card-title">🏆 Tổng kết tuần & Xếp hạng</div>
+    <div class="card-title">🏆 Tổng kết & Xếp hạng</div>
     <div class="grid-2">
-      <select id="sTuan" onchange="previewNNSHTT(); loadRankingTable(this.value); loadDiemNgayTable()"><option value="">-- Chọn tuần --</option></select>
-      <div></div>
       <input id="previewNN" placeholder="Điểm Nề nếp (hệ thống tính)" readonly style="background:#f8fafc;color:#047857;font-weight:bold;border:1px dashed #cbd5e1;">
       <input id="previewSHTT" placeholder="Điểm SHTT (hệ thống tính)" readonly style="background:#f8fafc;color:#047857;font-weight:bold;border:1px dashed #cbd5e1;">
       <input id="sDHT" placeholder="Nhập Điểm Học Tập (Tổng kết)">
@@ -679,13 +676,6 @@ async function renderScorePage(){
     <div id="scoreRank"></div>
   </div>`;
   loadScoreDropdownV1258();
-  
-  // Set default date to today
-  const today = new Date();
-  const yyyy = today.getFullYear();
-  const mm = String(today.getMonth() + 1).padStart(2, '0');
-  const dd = String(today.getDate()).padStart(2, '0');
-  document.getElementById('sNgay').value = `${yyyy}-${mm}-${dd}`;
 }
 
 async function loadRankingTable(tuan) {
@@ -762,15 +752,15 @@ async function loadLopTheoCaUI() {
   });
 }
 
-async function saveDiemNgayFE() {
+async function saveDiemTieuChiFE() {
   const lop = document.getElementById('sLop').value;
-  const ngay = document.getElementById('sNgay').value;
+  const tuan = document.getElementById('sTuan').value;
+  if (!tuan) return showToast('Vui lòng chọn tuần', 'error');
   if (!lop) return showToast('Vui lòng chọn lớp', 'error');
-  if (!ngay) return showToast('Vui lòng chọn ngày', 'error');
 
   const data = {
     LOP: lop,
-    NGAY: ngay,
+    TUAN: tuan,
     HOC_TOT: document.getElementById('sHocTot').value || 0,
     CHUYEN_CAN: document.getElementById('sChuyenCan').value || 0,
     DIEM_TOT: document.getElementById('sDiemTot').value || 0,
@@ -779,48 +769,44 @@ async function saveDiemNgayFE() {
   };
 
   await safeTask(async () => {
-    const res = await gs('saveDiemNgay', data);
+    const res = await gs('saveDiemTieuChiTuan', data);
     showToast(res.message);
     document.getElementById('sHocTot').value = '';
     document.getElementById('sChuyenCan').value = '';
     document.getElementById('sDiemTot').value = '';
     document.getElementById('sDiemXau').value = '';
-    await loadDiemNgayTable();
+    await loadDiemTieuChiTable();
   });
 }
 
-async function loadDiemNgayTable() {
+async function loadDiemTieuChiTable() {
   const lop = document.getElementById('sLop').value;
-  const tuan = document.getElementById('sTuan').value;
   if (!lop) {
     document.getElementById('tableDiemNgay').innerHTML = '<div style="color:#64748b">Vui lòng chọn lớp.</div>';
     return;
   }
   
   await safeTask(async () => {
-    // Nếu có chọn tuần, có thể tính khoảng ngày của tuần đó. Ở đây lấy theo tháng hoặc tuần tùy ý, nhưng để nhanh ta lấy tất cả của lớp đó rồi render.
-    let tuNgay = '';
-    let denNgay = '';
-    if (tuan) {
-       const khoang = await gs('getKhoangTuan', tuan);
-       if (khoang) { tuNgay = khoang.tuNgay; denNgay = khoang.denNgay; }
-    }
-    const diemList = await gs('getDiemNgay', lop, tuNgay, denNgay);
+    const diemList = await gs('getDiemTieuChiTuan', lop);
     
     if (!diemList || diemList.length === 0) {
-      document.getElementById('tableDiemNgay').innerHTML = '<div style="color:#64748b">Chưa có dữ liệu điểm ngày.</div>';
+      document.getElementById('tableDiemNgay').innerHTML = '<div style="color:#64748b">Chưa có dữ liệu điểm tiêu chí.</div>';
       return;
     }
     
-    // Sort by Date descending
-    diemList.sort((a,b) => new Date(b.NGAY) - new Date(a.NGAY));
+    // Sort by TUAN descending (assuming numeric extraction or simple string sort works for week)
+    diemList.sort((a,b) => {
+        const tA = parseInt(String(a.TUAN).replace(/\D/g,'')) || 0;
+        const tB = parseInt(String(b.TUAN).replace(/\D/g,'')) || 0;
+        return tB - tA;
+    });
 
     document.getElementById('tableDiemNgay').innerHTML = `
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Ngày</th>
+              <th>Tuần</th>
               <th>Học tốt</th>
               <th>Chuyên cần</th>
               <th>Điểm tốt</th>
@@ -830,7 +816,7 @@ async function loadDiemNgayTable() {
           <tbody>
             ${diemList.map(x => `
               <tr>
-                <td class="center">${x.NGAY}</td>
+                <td class="center bold">${x.TUAN}</td>
                 <td class="right">${x.HOC_TOT}</td>
                 <td class="right">${x.CHUYEN_CAN}</td>
                 <td class="right">${x.DIEM_TOT}</td>
