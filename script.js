@@ -414,8 +414,14 @@ async function loadStudentData(){
 async function renderRankPage(){
   document.getElementById('app').innerHTML = `
     <div class="card">
-      <div class="section-head"><div class="card-title" style="margin:0">🏫 Xếp hạng lớp</div><div style="min-width:320px"><label>Tuần</label><select id="rankWeek" onchange="loadRankData()"></select></div></div>
-      <div class="table-wrap"><table><thead><tr><th>Hạng</th><th>Khối</th><th>Lớp</th><th>Số HS vi phạm</th><th>Tổng lỗi</th><th>Tổng điểm trừ</th><th>Điểm nề nếp</th><th>SHTT</th><th>ĐHT</th><th>Kết quả thi đua tự động</th></tr></thead><tbody id="rankTable"></tbody></table></div>
+      <div class="section-head" style="flex-wrap:wrap; gap:12px;">
+        <div class="card-title" style="margin:0; width:100%;">🏫 Xếp hạng lớp</div>
+        <div style="display:flex; gap:12px; flex-wrap:wrap; width:100%;">
+          <div style="flex:1; min-width:150px;"><label>Tuần</label><select id="rankWeek" onchange="loadRankData()"></select></div>
+          <div style="flex:1; min-width:150px;"><label>Ca học</label><select id="rankCa" onchange="loadRankData()"><option value="">Tất cả các ca</option><option value="SANG">Ca Sáng</option><option value="CHIEU">Ca Chiều</option></select></div>
+        </div>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>Hạng</th><th>Khối</th><th>Lớp</th><th>Số HS vi phạm</th><th>Tổng lỗi</th><th>Tổng điểm trừ</th><th>Điểm nề nếp</th><th>SHTT</th><th>ĐHT</th><th>Kết quả thi đua</th></tr></thead><tbody id="rankTable"></tbody></table></div>
     </div>`;
   await safeTask(async()=>{
     const weeks = await gs('getDanhSachTuan');
@@ -425,10 +431,24 @@ async function renderRankPage(){
 }
 async function loadRankData(){
   const tuan = document.getElementById('rankWeek').value;
+  const ca = document.getElementById('rankCa').value;
+  
   await safeTask(async()=>{
-    const data = await gs('getXepHangLopAPI', tuan);
+    let data = await gs('getXepHangLopAPI', tuan);
+    
+    if (ca) {
+      const lopsCa = await gs('getLopTheoCa', ca);
+      data = data.filter(x => lopsCa.includes(x.LOP));
+    }
+    
+    // Sort logically like the score page
+    data = data.sort((a,b) => {
+      if (b.DIEM_THI_DUA !== a.DIEM_THI_DUA) return b.DIEM_THI_DUA - a.DIEM_THI_DUA;
+      return a.TONG_LOI - b.TONG_LOI;
+    }).map((x,i) => ({...x, XEP_HANG: i+1}));
+
     const rankTbl = document.getElementById('rankTable');
-      if (rankTbl) rankTbl.innerHTML = data.length ? data.map(x=>`<tr><td class="center bold">${fmtNum(x.XEP_HANG)}</td><td class="center">${escapeHtml(x.KHOI)}</td><td class="center bold">${escapeHtml(x.LOP)}</td><td class="center">${fmtNum(x.SO_HOC_SINH_VI_PHAM)}</td><td class="center">${fmtNum(x.TONG_LOI)}</td><td class="right">${fmtNum(x.TONG_DIEM_TRU)}</td><td class="right">${fmtNum(x.NN)}</td><td class="right">${fmtNum(x.SHTT)}</td><td class="right">${fmtNum(x.DHT)}</td><td class="right bold">${fmtNum(x.DIEM_THI_DUA)}</td></tr>`).join('') : emptyRows(10);
+    if (rankTbl) rankTbl.innerHTML = data.length ? data.map(x=>`<tr><td class="center bold">${fmtNum(x.XEP_HANG)}</td><td class="center">${escapeHtml(x.KHOI)}</td><td class="center bold">${escapeHtml(x.LOP)}</td><td class="center">${fmtNum(x.SO_HOC_SINH_VI_PHAM)}</td><td class="center">${fmtNum(x.TONG_LOI)}</td><td class="right">${fmtNum(x.TONG_DIEM_TRU)}</td><td class="right">${fmtNum(x.NN)}</td><td class="right">${fmtNum(x.SHTT)}</td><td class="right">${fmtNum(x.DHT)}</td><td class="right bold">${fmtNum(x.DIEM_THI_DUA)}</td></tr>`).join('') : emptyRows(10);
   });
 }
 
@@ -939,10 +959,12 @@ async function doGuestLogin() {
     
     if (role === 'VIEWER') {
       const form = document.querySelector('.menu-item[data-page="form"]'); if(form) form.style.display = 'none';
+      const classSched = document.querySelector('.menu-item[data-page="classSchedule"]'); if(classSched) classSched.style.display = 'none';
       const score = document.querySelector('.menu-item[data-page="score"]'); if(score) score.style.display = 'none';
       const exp = document.querySelector('.menu-item[data-page="export"]'); if(exp) exp.style.display = 'none';
       const adm = document.querySelector('.menu-item[data-page="admin"]'); if(adm) adm.style.display = 'none';
     } else if (role === 'SCORER') {
+      const classSched = document.querySelector('.menu-item[data-page="classSchedule"]'); if(classSched) classSched.style.display = 'none';
       const score = document.querySelector('.menu-item[data-page="score"]'); if(score) score.style.display = 'none';
       const exp = document.querySelector('.menu-item[data-page="export"]'); if(exp) exp.style.display = 'none';
       const adm = document.querySelector('.menu-item[data-page="admin"]'); if(adm) adm.style.display = 'none';
