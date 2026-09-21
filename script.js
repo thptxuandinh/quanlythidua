@@ -467,7 +467,35 @@ async function renderWeekPage(){
 async function loadWeekReportData(){
   const tuan = document.getElementById('reportWeek').value;
   await safeTask(async()=>{
-    const data = await gs('getDanhSachViPhamTheoTuan', tuan);
+    let data = await gs('getDanhSachViPhamTheoTuan', tuan);
+    
+    // Sort logic: Date -> Khoi -> Lop
+    data.sort((a, b) => {
+      // 1. Sort by Date (ascending)
+      const parseDate = (dStr) => {
+        if (!dStr) return 0;
+        const parts = String(dStr).split('/');
+        if (parts.length === 3) {
+          return new Date(parts[2], parts[1] - 1, parts[0]).getTime();
+        }
+        return new Date(dStr).getTime() || 0;
+      };
+      
+      const timeA = parseDate(a.NGAY_VP);
+      const timeB = parseDate(b.NGAY_VP);
+      if (timeA !== timeB) return timeA - timeB;
+      
+      // 2. Sort by Khoi (numeric)
+      const khoiA = parseInt(a.KHOI) || 0;
+      const khoiB = parseInt(b.KHOI) || 0;
+      if (khoiA !== khoiB) return khoiA - khoiB;
+      
+      // 3. Sort by Lop (alphanumeric, so 10A2 comes before 10A10)
+      const lopA = String(a.LOP || '');
+      const lopB = String(b.LOP || '');
+      return lopA.localeCompare(lopB, undefined, { numeric: true, sensitivity: 'base' });
+    });
+
     document.getElementById('reportTable').innerHTML = data.length ? data.map(x=>`<tr><td class="center">${escapeHtml(x.NGAY_VP)}</td><td class="center">${escapeHtml(x.KHOI)}</td><td class="center bold">${escapeHtml(x.LOP)}</td><td>${escapeHtml(x.HO_TEN)}</td><td class="center">${escapeHtml(x.NHOM_LOI)}</td><td>${escapeHtml(x.TEN_LOI || x.tenLoi || '')}</td><td class="center">${fmtNum(x.SO_LAN || 1)}</td><td class="right">${fmtNum(x.DIEM_TRU || x.diemTru || 0)}</td><td>${escapeHtml(x.GHI_CHU || '')}</td></tr>`).join('') : emptyRows(9);
   });
 }
