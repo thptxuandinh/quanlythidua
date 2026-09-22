@@ -702,7 +702,6 @@ async function renderScorePage(){
       <input id="previewNN" placeholder="Điểm Nề nếp (hệ thống tính)" readonly style="background:#f8fafc;color:#047857;font-weight:bold;border:1px dashed #cbd5e1;">
       <input id="previewSHTT" placeholder="Điểm SHTT (hệ thống tính)" readonly style="background:#f8fafc;color:#047857;font-weight:bold;border:1px dashed #cbd5e1;">
       <input id="sDHT" placeholder="Nhập Điểm Học Tập (Tổng kết)">
-      <input id="sTDT" placeholder="Nhập Điểm Thi Đua (Tổng kết)">
     </div>
     <button class="btn-primary" style="margin-top:14px" onclick="saveScoreV123()">Lưu tổng kết & Xếp hạng</button>
     <button class="btn-danger" style="margin-top:14px;margin-left:8px" onclick="deleteScoreV123()">Xóa tổng kết</button>
@@ -893,19 +892,16 @@ async function saveScoreV123() {
     const tuan = document.getElementById('sTuan').value;
     const lop = document.getElementById('sLop').value;
     const dht = document.getElementById('sDHT').value;
-    const tdt = document.getElementById('sTDT').value;
     
     if (!tuan) return showToast('Vui lòng chọn tuần', 'error');
     if (!lop) return showToast('Vui lòng chọn lớp', 'error');
     if (dht === '') return showToast('Vui lòng nhập điểm học tập', 'error');
-    if (tdt === '') return showToast('Vui lòng nhập điểm thi đua', 'error');
     
     await safeTask(async () => {
         await gs('saveDiemHocTapV123', {
             TUAN: tuan,
             LOP: lop,
-            DHT: Number(dht),
-            TDT: Number(tdt)
+            DHT: Number(dht)
         });
         showToast(`Đã lưu điểm cho lớp ${lop} (Tuần ${tuan})`);
         loadRankingTable(tuan);
