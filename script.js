@@ -909,6 +909,10 @@ async function saveScoreV123() {
 }
 
 async function deleteScoreV123() {
+    if (window.currentUserRole === 'VIEWER' || window.currentUserRole === 'SCORER') {
+        showToast('Bạn không có quyền xóa tổng kết. Chỉ Admin mới được phép.', 'error');
+        return;
+    }
     const tuan = document.getElementById('sTuan').value;
     const lop = document.getElementById('sLop').value;
     
@@ -987,11 +991,15 @@ async function doGuestLogin() {
       const score = document.querySelector('.menu-item[data-page="score"]'); if(score) score.style.display = 'none';
       const exp = document.querySelector('.menu-item[data-page="export"]'); if(exp) exp.style.display = 'none';
       const adm = document.querySelector('.menu-item[data-page="admin"]'); if(adm) adm.style.display = 'none';
+      const btnDel = document.getElementById('btnDeleteViolation'); if(btnDel) btnDel.style.display = 'none';
     } else if (role === 'SCORER') {
       const classSched = document.querySelector('.menu-item[data-page="classSchedule"]'); if(classSched) classSched.style.display = 'none';
       const score = document.querySelector('.menu-item[data-page="score"]'); if(score) score.style.display = 'none';
       const exp = document.querySelector('.menu-item[data-page="export"]'); if(exp) exp.style.display = 'none';
       const adm = document.querySelector('.menu-item[data-page="admin"]'); if(adm) adm.style.display = 'none';
+      const btnDel = document.getElementById('btnDeleteViolation'); if(btnDel) btnDel.style.display = 'none';
+    } else {
+      const btnDel = document.getElementById('btnDeleteViolation'); if(btnDel) btnDel.style.display = 'inline-block';
     }
     
     openPage('dashboard', document.querySelector('.menu-item[data-page="dashboard"]'));
@@ -1015,6 +1023,10 @@ function closeViolationModal(){
 }
 
 async function deleteSelectedViolation(){
+   if (window.currentUserRole === 'VIEWER' || window.currentUserRole === 'SCORER') {
+       showToast('Bạn không có quyền xóa lỗi. Chỉ Admin mới được phép.', 'error');
+       return;
+   }
    const ids=[...document.querySelectorAll('.vpCheck:checked')].map(x=>x.value);
    if(!ids.length){showToast('Chưa chọn lỗi cần xóa','error');return;}
    if(!confirm('Xác nhận xóa '+ids.length+' lỗi?')) return;
