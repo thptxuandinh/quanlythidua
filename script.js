@@ -680,14 +680,15 @@ async function renderScorePage(){
     </div>
     
     <div id="diemNgayWrap" style="margin-top:16px; display:none; padding:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;">
-      <div class="sub-title" style="margin-bottom:12px;">📝 Nhập điểm tiêu chí tuần (Học tốt, Chuyên cần...)</div>
+      <div class="sub-title" style="margin-bottom:12px;">📝 Nhập điểm tiêu chí tuần</div>
       <div class="grid-2">
-        <div><label>Học tốt</label><input type="number" id="sHocTot" placeholder="Nhập điểm số"></div>
-        <div><label>Chuyên cần</label><input type="number" id="sChuyenCan" placeholder="Nhập điểm số"></div>
-        <div><label>Điểm tốt</label><input type="number" id="sDiemTot" placeholder="Nhập điểm số"></div>
+        <div><label>Ngày học tốt (Max 5)</label><input type="number" id="sHocTot" max="5" placeholder="Nhập điểm số"></div>
+        <div><label>Ngày chuyên cần (Max 5)</label><input type="number" id="sChuyenCan" max="5" placeholder="Nhập điểm số"></div>
+        <div><label>Điểm tốt (Max 20)</label><input type="number" id="sDiemTot" max="20" placeholder="Nhập điểm số"></div>
         <div><label>Điểm xấu</label><input type="number" id="sDiemXau" placeholder="Nhập điểm số"></div>
+        <div><label>Điểm trung bình</label><input type="number" id="sDiemTB" placeholder="Nhập điểm số"></div>
       </div>
-      <button class="btn-primary" style="margin-top:14px" onclick="saveDiemTieuChiFE()">Lưu điểm tiêu chí tuần</button>
+      <button class="btn-primary" style="margin-top:14px" onclick="saveDiemTieuChiFE()">Lưu điểm tiêu chí & Cập nhật xếp hạng</button>
       
       <div style="margin-top:20px;">
         <h4 style="margin-bottom:8px;">📊 Dữ liệu điểm tiêu chí các tuần</h4>
@@ -696,17 +697,6 @@ async function renderScorePage(){
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-title">🏆 Tổng kết & Xếp hạng</div>
-    <div class="grid-2">
-      <input id="previewNN" placeholder="Điểm Nề nếp (hệ thống tính)" readonly style="background:#f8fafc;color:#047857;font-weight:bold;border:1px dashed #cbd5e1;">
-      <input id="previewSHTT" placeholder="Điểm SHTT (hệ thống tính)" readonly style="background:#f8fafc;color:#047857;font-weight:bold;border:1px dashed #cbd5e1;">
-      <input id="sDHT" placeholder="Nhập Điểm Học Tập (Tổng kết)">
-    </div>
-    <button class="btn-primary" style="margin-top:14px" onclick="saveScoreV123()">Lưu tổng kết & Xếp hạng</button>
-    <button class="btn-danger" style="margin-top:14px;margin-left:8px" onclick="deleteScoreV123()">Xóa tổng kết</button>
-  </div>
-  
   <div class="card">
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
       <span>Kết quả xếp hạng tuần</span>
@@ -805,13 +795,22 @@ async function saveDiemTieuChiFE() {
   if (!tuan) return showToast('Vui lòng chọn tuần', 'error');
   if (!lop) return showToast('Vui lòng chọn lớp', 'error');
 
+  const hocTot = Number(document.getElementById('sHocTot').value || 0);
+  const chuyenCan = Number(document.getElementById('sChuyenCan').value || 0);
+  const diemTot = Number(document.getElementById('sDiemTot').value || 0);
+
+  if (hocTot > 5) return showToast('Ngày học tốt tối đa là 5', 'error');
+  if (chuyenCan > 5) return showToast('Ngày chuyên cần tối đa là 5', 'error');
+  if (diemTot > 20) return showToast('Điểm tốt tối đa là 20', 'error');
+
   const data = {
     LOP: lop,
     TUAN: tuan,
-    HOC_TOT: document.getElementById('sHocTot').value || 0,
-    CHUYEN_CAN: document.getElementById('sChuyenCan').value || 0,
-    DIEM_TOT: document.getElementById('sDiemTot').value || 0,
+    HOC_TOT: hocTot,
+    CHUYEN_CAN: chuyenCan,
+    DIEM_TOT: diemTot,
     DIEM_XAU: document.getElementById('sDiemXau').value || 0,
+    DIEM_TB: document.getElementById('sDiemTB').value || 0,
     NGUOI_NHAP: window.currentUser ? window.currentUser.USERNAME : ''
   };
 
@@ -822,7 +821,9 @@ async function saveDiemTieuChiFE() {
     document.getElementById('sChuyenCan').value = '';
     document.getElementById('sDiemTot').value = '';
     document.getElementById('sDiemXau').value = '';
+    document.getElementById('sDiemTB').value = '';
     await loadDiemTieuChiTable();
+    loadRankingTable(tuan);
   });
 }
 
@@ -841,7 +842,7 @@ async function loadDiemTieuChiTable() {
       return;
     }
     
-    // Sort by TUAN descending (assuming numeric extraction or simple string sort works for week)
+    // Sort by TUAN descending
     diemList.sort((a,b) => {
         const tA = parseInt(String(a.TUAN).replace(/\D/g,'')) || 0;
         const tB = parseInt(String(b.TUAN).replace(/\D/g,'')) || 0;
@@ -854,8 +855,9 @@ async function loadDiemTieuChiTable() {
           <thead>
             <tr>
               <th>Tuần</th>
-              <th>Học tốt</th>
-              <th>Chuyên cần</th>
+              <th>Điểm TB</th>
+              <th>Ngày Học tốt</th>
+              <th>Ngày Chuyên cần</th>
               <th>Điểm tốt</th>
               <th>Điểm xấu</th>
             </tr>
@@ -864,6 +866,7 @@ async function loadDiemTieuChiTable() {
             ${diemList.map(x => `
               <tr>
                 <td class="center bold">${x.TUAN}</td>
+                <td class="right">${x.DIEM_TB || 0}</td>
                 <td class="right">${x.HOC_TOT}</td>
                 <td class="right">${x.CHUYEN_CAN}</td>
                 <td class="right">${x.DIEM_TOT}</td>
