@@ -688,6 +688,10 @@ async function renderScorePage(){
         <div><label>Điểm xấu</label><input type="number" id="sDiemXau" placeholder="Nhập điểm số"></div>
         <div><label>Điểm trung bình</label><input type="number" id="sDiemTB" placeholder="Nhập điểm số"></div>
       </div>
+      <div style="margin-top:12px;">
+        <label>Ghi chú lỗi của tuần (tùy chọn)</label>
+        <textarea id="sGhiChu" rows="2" placeholder="Nhập ghi chú..."></textarea>
+      </div>
       <button class="btn-primary" style="margin-top:14px" onclick="saveDiemTieuChiFE()">Lưu điểm tiêu chí & Cập nhật xếp hạng</button>
       
       <div style="margin-top:20px;">
@@ -811,6 +815,7 @@ async function saveDiemTieuChiFE() {
     DIEM_TOT: diemTot,
     DIEM_XAU: document.getElementById('sDiemXau').value || 0,
     DIEM_TB: document.getElementById('sDiemTB').value || 0,
+    GHI_CHU: document.getElementById('sGhiChu').value || '',
     NGUOI_NHAP: window.currentUser ? window.currentUser.USERNAME : ''
   };
 
@@ -822,6 +827,7 @@ async function saveDiemTieuChiFE() {
     document.getElementById('sDiemTot').value = '';
     document.getElementById('sDiemXau').value = '';
     document.getElementById('sDiemTB').value = '';
+    document.getElementById('sGhiChu').value = '';
     await loadDiemTieuChiTable();
     loadRankingTable(tuan);
   });
@@ -860,6 +866,7 @@ async function loadDiemTieuChiTable() {
               <th>Ngày Chuyên cần</th>
               <th>Điểm tốt</th>
               <th>Điểm xấu</th>
+              <th>Ghi chú</th>
             </tr>
           </thead>
           <tbody>
@@ -871,6 +878,7 @@ async function loadDiemTieuChiTable() {
                 <td class="right">${x.CHUYEN_CAN}</td>
                 <td class="right">${x.DIEM_TOT}</td>
                 <td class="right">${x.DIEM_XAU}</td>
+                <td>${escapeHtml(x.GHI_CHU || '')}</td>
               </tr>
             `).join('')}
           </tbody>
