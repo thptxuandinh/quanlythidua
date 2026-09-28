@@ -32,7 +32,7 @@ function showToast(message,type='success'){
   clearTimeout(showToast._t); showToast._t=setTimeout(()=>{el.style.display='none';},duration);
 }
 function escapeHtml(v){ return String(v ?? '').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
-function fmtNum(v){ const n=Number(v||0); return Number.isInteger(n) ? String(n) : n.toFixed(2); }
+function fmtNum(v){ const n=Number(v||0); return Number.isInteger(n) ? String(n) : parseFloat(n.toFixed(3)).toString(); }
 function emptyRows(colspan,text='Không có dữ liệu'){ return `<tr><td colspan="${colspan}" class="center empty">${text}</td></tr>`; }
 function todayStr(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
@@ -723,11 +723,10 @@ async function renderScorePage(){
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
       <span>Kết quả xếp hạng tuần</span>
       <div style="display:flex;gap:8px">
-        <select id="sKhoiFilter" style="width:150px;min-height:36px;padding:6px;border-radius:8px" onchange="renderRankTable()">
-          <option value="">Tất cả khối</option>
-          <option value="10">Khối 10</option>
-          <option value="11">Khối 11</option>
-          <option value="12">Khối 12</option>
+        <select id="sCaFilter" style="width:150px;min-height:36px;padding:6px;border-radius:8px" onchange="renderRankTable()">
+          <option value="">Tất cả các ca</option>
+          <option value="SANG">Ca Sáng</option>
+          <option value="CHIEU">Ca Chiều</option>
         </select>
         <button class="btn-primary" style="padding:6px 16px;min-height:36px" onclick="exportRankExcel()">Xuất Excel</button>
       </div>
@@ -756,10 +755,10 @@ async function loadRankingTable(tuan) {
 
 function renderRankTable() {
   if (!window.currentRankData) return;
-  const khoi = document.getElementById('sKhoiFilter').value;
+  const caFilter = document.getElementById('sCaFilter').value;
   let d = window.currentRankData;
-  if (khoi) {
-    d = d.filter(x => String(x.KHOI) === String(khoi));
+  if (caFilter) {
+    d = d.filter(x => String(x.CA).toUpperCase() === String(caFilter).toUpperCase());
   }
   d = d.sort((a,b) => {
     if (b.DIEM_THI_DUA !== a.DIEM_THI_DUA) return b.DIEM_THI_DUA - a.DIEM_THI_DUA;
@@ -778,9 +777,9 @@ function exportRankExcel() {
     showToast('Không có dữ liệu để xuất', 'error');
     return;
   }
-  const khoi = document.getElementById('sKhoiFilter').value;
+  const caFilter = document.getElementById('sCaFilter').value;
   let d = window.currentRankData;
-  if (khoi) d = d.filter(x => String(x.KHOI) === String(khoi));
+  if (caFilter) d = d.filter(x => String(x.CA).toUpperCase() === String(caFilter).toUpperCase());
   
   d = d.sort((a,b) => {
     if (b.DIEM_THI_DUA !== a.DIEM_THI_DUA) return b.DIEM_THI_DUA - a.DIEM_THI_DUA;
