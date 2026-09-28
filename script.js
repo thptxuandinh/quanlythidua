@@ -693,8 +693,11 @@ async function renderScorePage(){
     <div class="card-title">📚 Quản lý điểm - Nhập điểm tiêu chí tuần</div>
     <div class="grid-2">
       <select id="sTuan" onchange="previewNNSHTT(); loadRankingTable(this.value); loadDiemTieuChiTable()"><option value="">-- Chọn tuần --</option></select>
-      <select id="sCa" onchange="loadLopTheoCaUI()"><option value="">-- Chọn ca --</option><option value="SANG">Ca Sáng</option><option value="CHIEU">Ca Chiều</option></select>
-      <select id="sLop" onchange="loadDiemTieuChiTable(); previewNNSHTT()"><option value="">-- Chọn lớp --</option></select>
+      <select id="sCa" onchange="loadLopTheoCaUI(); renderRankTable()"><option value="">-- Chọn ca --</option><option value="SANG">Ca Sáng</option><option value="CHIEU">Ca Chiều</option></select>
+    </div>
+    
+    <div style="margin-top:12px;">
+      <select id="sLop" style="width:100%;padding:8px;border-radius:8px;border:1px solid #cbd5e1" onchange="previewNNSHTT();loadDiemTieuChiTable()"><option value="">-- Chọn lớp --</option></select>
     </div>
     
     <div id="diemNgayWrap" style="margin-top:16px; display:none; padding:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;">
@@ -723,11 +726,6 @@ async function renderScorePage(){
     <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
       <span>Kết quả xếp hạng tuần</span>
       <div style="display:flex;gap:8px">
-        <select id="sCaFilter" style="width:150px;min-height:36px;padding:6px;border-radius:8px" onchange="renderRankTable()">
-          <option value="">Tất cả các ca</option>
-          <option value="SANG">Ca Sáng</option>
-          <option value="CHIEU">Ca Chiều</option>
-        </select>
         <button class="btn-primary" style="padding:6px 16px;min-height:36px" onclick="exportRankExcel()">Xuất Excel</button>
       </div>
     </div>
@@ -755,7 +753,8 @@ async function loadRankingTable(tuan) {
 
 function renderRankTable() {
   if (!window.currentRankData) return;
-  const caFilter = document.getElementById('sCaFilter').value;
+  const caFilterEl = document.getElementById('sCa');
+  const caFilter = caFilterEl ? caFilterEl.value : '';
   let d = window.currentRankData;
   if (caFilter) {
     d = d.filter(x => String(x.CA).toUpperCase() === String(caFilter).toUpperCase());
@@ -777,7 +776,8 @@ function exportRankExcel() {
     showToast('Không có dữ liệu để xuất', 'error');
     return;
   }
-  const caFilter = document.getElementById('sCaFilter').value;
+  const caFilterEl = document.getElementById('sCa');
+  const caFilter = caFilterEl ? caFilterEl.value : '';
   let d = window.currentRankData;
   if (caFilter) d = d.filter(x => String(x.CA).toUpperCase() === String(caFilter).toUpperCase());
   
