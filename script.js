@@ -425,8 +425,11 @@ async function renderRankPage(){
     </div>`;
   await safeTask(async()=>{
     const weeks = await gs('getDanhSachTuan');
-    document.getElementById('rankWeek').innerHTML = weeks.map(x=>`<option value="${x.value}" ${x.current?'selected':''}>${escapeHtml(x.label)}</option>`).join('');
-    await loadRankData();
+    const rankWeekEl = document.getElementById('rankWeek');
+    if (rankWeekEl) {
+      rankWeekEl.innerHTML = weeks.map(x=>`<option value="${x.value}" ${x.current?'selected':''}>${escapeHtml(x.label)}</option>`).join('');
+      await loadRankData();
+    }
   });
 }
 async function loadRankData(){
@@ -448,7 +451,7 @@ async function loadRankData(){
     }).map((x,i) => ({...x, XEP_HANG: i+1}));
 
     const rankTbl = document.getElementById('rankTable');
-    if (rankTbl) rankTbl.innerHTML = data.length ? data.map(x=>`<tr><td class="center bold">${fmtNum(x.XEP_HANG)}</td><td class="center">${escapeHtml(x.KHOI)}</td><td class="center bold">${escapeHtml(x.LOP)}</td><td class="center">${fmtNum(x.SO_HOC_SINH_VI_PHAM)}</td><td class="center">${fmtNum(x.TONG_LOI)}</td><td class="right">${fmtNum(x.TONG_DIEM_TRU)}</td><td class="right">${fmtNum(x.NN)}</td><td class="right">${fmtNum(x.SHTT)}</td><td class="right">${fmtNum(x.DHT)}</td><td class="right bold">${fmtNum(x.DIEM_THI_DUA)}</td></tr>`).join('') : emptyRows(10);
+    if (rankTbl) rankTbl.innerHTML = data.length ? data.map(x=>`<tr><td class="center bold">${fmtNum(x.XEP_HANG)}</td><td class="center">${escapeHtml(x.KHOI)}</td><td class="center bold">${escapeHtml(x.LOP)}</td><td class="center">${fmtNum(x.SO_HOC_SINH_VI_PHAM)}</td><td class="center">${fmtNum(x.TONG_LOI)}</td><td class="center">${fmtNum(x.TONG_DIEM_TRU)}</td><td class="center">${fmtNum(x.NN)}</td><td class="center">${fmtNum(x.SHTT)}</td><td class="center">${fmtNum(x.DHT)}</td><td class="center bold">${fmtNum(x.DIEM_THI_DUA)}</td></tr>`).join('') : emptyRows(10);
   });
 }
 
@@ -460,8 +463,11 @@ async function renderWeekPage(){
     </div>`;
   await safeTask(async()=>{
     const weeks = await gs('getDanhSachTuan');
-    document.getElementById('reportWeek').innerHTML = weeks.map(x=>`<option value="${x.value}" ${x.current?'selected':''}>${escapeHtml(x.label)}</option>`).join('');
-    await loadWeekReportData();
+    const reportWeekEl = document.getElementById('reportWeek');
+    if (reportWeekEl) {
+      reportWeekEl.innerHTML = weeks.map(x=>`<option value="${x.value}" ${x.current?'selected':''}>${escapeHtml(x.label)}</option>`).join('');
+      await loadWeekReportData();
+    }
   });
 }
 async function loadWeekReportData(){
@@ -511,14 +517,20 @@ async function renderExportPage(){
     </div>`;
   await safeTask(async()=>{
     const weeks = await gs('getDanhSachTuan');
-    document.getElementById('exportWeek').innerHTML = weeks.map(x=>`<option value="${x.value}" ${x.current?'selected':''}>${escapeHtml(x.label)}</option>`).join('');
+    const exportWeekEl = document.getElementById('exportWeek');
+    if (exportWeekEl) {
+      exportWeekEl.innerHTML = weeks.map(x=>`<option value="${x.value}" ${x.current?'selected':''}>${escapeHtml(x.label)}</option>`).join('');
+    }
   });
 }
 async function exportExcelTuan(){
   const tuan = document.getElementById('exportWeek').value;
   await safeTask(async()=>{
     const url = await gs('exportBaoCaoTuan', tuan);
-    document.getElementById('exportResult').innerHTML = `<div class="muted-box"><div><b>✅ Xuất báo cáo thành công</b></div><div style="margin-top:8px"><a href="${url}" target="_blank"><button class="btn-primary">⬇️ Mở file Excel</button></a></div></div>`;
+    const exportResultEl = document.getElementById('exportResult');
+    if (exportResultEl) {
+      exportResultEl.innerHTML = `<div class="muted-box"><div><b>✅ Xuất báo cáo thành công</b></div><div style="margin-top:8px"><a href="${url}" target="_blank"><button class="btn-primary">⬇️ Mở file Excel</button></a></div></div>`;
+    }
     showToast('Đã tạo file Excel thành công');
   });
 }
@@ -582,7 +594,10 @@ async function renderAdminPage(){
   async function loadAdminAccounts() {
     await safeTask(async()=>{ 
         const accs = await gs('getDanhSachTaiKhoan');
-        document.getElementById('adminAccountsTable').innerHTML = accs.map(x=>`<tr><td>${escapeHtml(x.USERNAME)}</td><td>${escapeHtml(x.ROLE)}</td><td><button class="btn-danger" style="padding:2px 6px;font-size:12px;" onclick="deleteAdminAccount('${escapeHtml(x.USERNAME)}')">Xóa</button></td></tr>`).join('');
+        const adminAccountsTableEl = document.getElementById('adminAccountsTable');
+        if (adminAccountsTableEl) {
+          adminAccountsTableEl.innerHTML = accs.map(x=>`<tr><td>${escapeHtml(x.USERNAME)}</td><td>${escapeHtml(x.ROLE)}</td><td><button class="btn-danger" style="padding:2px 6px;font-size:12px;" onclick="deleteAdminAccount('${escapeHtml(x.USERNAME)}')">Xóa</button></td></tr>`).join('');
+        }
     });
   }
   async function saveAdminAccount(){
@@ -643,7 +658,9 @@ async function renderClassSchedulePage() {
 async function loadClassSchedule() {
   await safeTask(async () => {
     const list = await gs('getDanhSachSapXep');
-    document.getElementById('classScheduleTable').innerHTML = list.map(x => `
+    const classScheduleTableEl = document.getElementById('classScheduleTable');
+    if (classScheduleTableEl) {
+      classScheduleTableEl.innerHTML = list.map(x => `
       <tr>
         <td class="bold center">${escapeHtml(x.LOP)}</td>
         <td class="center">
@@ -658,6 +675,7 @@ async function loadClassSchedule() {
         </td>
       </tr>
     `).join('');
+    }
   });
 }
 
@@ -721,7 +739,8 @@ async function renderScorePage(){
 
 async function loadRankingTable(tuan) {
   if (!tuan) {
-    document.getElementById('scoreRank').innerHTML = '';
+    const scoreRankEl = document.getElementById('scoreRank');
+    if (scoreRankEl) scoreRankEl.innerHTML = '';
     return;
   }
   showLoading(true);
@@ -747,8 +766,11 @@ function renderRankTable() {
     return a.TONG_LOI - b.TONG_LOI;
   }).map((x,i) => ({...x, HANG: i+1}));
 
-  document.getElementById('scoreRank').innerHTML='<div class="table-wrap"><table><thead><tr><th>Hạng</th><th>Lớp</th><th>ĐHT</th><th>NN</th><th>SHTT</th><th>TĐT</th></tr></thead><tbody>'+
-  d.map(x=>`<tr><td class="center">${x.HANG}</td><td class="center bold">${x.LOP}</td><td class="right">${x.DHT}</td><td class="right">${x.NN}</td><td class="right">${x.SHTT}</td><td class="right bold">${x.DIEM_THI_DUA}</td></tr>`).join('')+'</tbody></table></div>';
+  const scoreRankEl = document.getElementById('scoreRank');
+  if (scoreRankEl) {
+    scoreRankEl.innerHTML='<div class="table-wrap"><table><thead><tr><th>Hạng</th><th>Lớp</th><th>ĐHT</th><th>NN</th><th>SHTT</th><th>TĐT</th></tr></thead><tbody>'+
+    d.map(x=>`<tr><td class="center">${x.HANG}</td><td class="center bold">${x.LOP}</td><td class="center">${x.DHT}</td><td class="center">${x.NN}</td><td class="center">${x.SHTT}</td><td class="center bold">${x.DIEM_THI_DUA}</td></tr>`).join('')+'</tbody></table></div>';
+  }
 }
 
 function exportRankExcel() {
@@ -834,17 +856,26 @@ async function saveDiemTieuChiFE() {
 }
 
 async function loadDiemTieuChiTable() {
-  const lop = document.getElementById('sLop').value;
+  const sLopEl = document.getElementById('sLop');
+  if (!sLopEl) return;
+  const lop = sLopEl.value;
+  
+  const tableDiemNgayEl = document.getElementById('tableDiemNgay');
+  if (!tableDiemNgayEl) return;
+
   if (!lop) {
-    document.getElementById('tableDiemNgay').innerHTML = '<div style="color:#64748b">Vui lòng chọn lớp.</div>';
+    tableDiemNgayEl.innerHTML = '<div style="color:#64748b">Vui lòng chọn lớp.</div>';
     return;
   }
   
   await safeTask(async () => {
     const diemList = await gs('getDiemTieuChiTuan', lop);
     
+    const tableEl = document.getElementById('tableDiemNgay');
+    if (!tableEl) return;
+
     if (!diemList || diemList.length === 0) {
-      document.getElementById('tableDiemNgay').innerHTML = '<div style="color:#64748b">Chưa có dữ liệu điểm tiêu chí.</div>';
+      tableEl.innerHTML = '<div style="color:#64748b">Chưa có dữ liệu điểm tiêu chí.</div>';
       return;
     }
     
@@ -855,7 +886,7 @@ async function loadDiemTieuChiTable() {
         return tB - tA;
     });
 
-    document.getElementById('tableDiemNgay').innerHTML = `
+    tableEl.innerHTML = `
       <div class="table-wrap">
         <table>
           <thead>
@@ -891,11 +922,17 @@ async function loadDiemTieuChiTable() {
 async function loadScoreDropdownV1258(){
   await safeTask(async()=>{
    const weeks=await gs('getDanhSachTuan')||[];
-   document.getElementById('sTuan').innerHTML='<option value="">-- Chọn tuần --</option>'+
-   weeks.map(x=>`<option value="${x.value||x.TUAN}">${x.label||x.value||x.TUAN}</option>`).join('');
+   const sTuanEl = document.getElementById('sTuan');
+   if (sTuanEl) {
+     sTuanEl.innerHTML='<option value="">-- Chọn tuần --</option>'+
+     weeks.map(x=>`<option value="${x.value||x.TUAN}">${x.label||x.value||x.TUAN}</option>`).join('');
+   }
    const lops=await gs('getLop')||[];
-   document.getElementById('sLop').innerHTML='<option value="">-- Chọn lớp --</option>'+
-   lops.map(x=>`<option>${x}</option>`).join('');
+   const sLopEl = document.getElementById('sLop');
+   if (sLopEl) {
+     sLopEl.innerHTML='<option value="">-- Chọn lớp --</option>'+
+     lops.map(x=>`<option>${x}</option>`).join('');
+   }
   });
 }
 
