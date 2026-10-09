@@ -74,7 +74,11 @@ async function gs(method, ...args) {
     }
   }
 
-  const MAX_RETRIES = 3;
+  // Write methods: do NOT retry to avoid duplicate records
+  const WRITE_METHODS = ['saveViPham', 'saveDiemTieuChiTuan', 'saveDiemHocTapV123', 'luuDiemHocTap', 'themHocSinh', 'themLop', 'themLoiViPham', 'taoTaiKhoan', 'saveSapXepLop'];
+  const isWrite = WRITE_METHODS.includes(method);
+  const MAX_RETRIES = isWrite ? 1 : 3;
+
   const payload = JSON.stringify({ method, args });
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -140,7 +144,7 @@ async function gs(method, ...args) {
       if (err.message && !err.message.includes("Failed to fetch")) {
         throw err;
       }
-      // Network error - retry
+      // Network error - retry only for read methods
       console.warn(`[gs] Attempt ${attempt}/${MAX_RETRIES}: Network error for "${method}":`, err.message);
       if (attempt < MAX_RETRIES) {
         await new Promise(r => setTimeout(r, 1500 * attempt));
@@ -366,7 +370,10 @@ function recalcActualScore(){
     document.getElementById('diemTru').value = autoValue ? String(autoValue) : '';
   }
 }
+let _isSavingVP = false;
 async function saveFormViPham(){
+  if (_isSavingVP) { showToast('Đang lưu, vui lòng đợi...', 'error'); return; }
+  _isSavingVP = true;
   const hs = document.getElementById('hocSinh');
   const payload = {
     ngay: document.getElementById('ngayVP').value,
@@ -379,11 +386,15 @@ async function saveFormViPham(){
     diemTruGv: document.getElementById('diemTru').value,
     ghiChu: document.getElementById('ghiChu').value
   };
-  await safeTask(async()=>{
-    const res = await gs('saveViPham', payload);
-    showToast(res.message || 'Đã lưu vi phạm');
-    resetFormViPham();
-  });
+  try {
+    await safeTask(async()=>{
+      const res = await gs('saveViPham', payload);
+      showToast(res.message || 'Đã lưu vi phạm');
+      resetFormViPham();
+    });
+  } finally {
+    _isSavingVP = false;
+  }
 }
 
 async function renderStudentPage(){
@@ -526,12 +537,28 @@ async function renderExportPage(){
 async function exportExcelTuan(){
   const tuan = document.getElementById('exportWeek').value;
   await safeTask(async()=>{
-    const url = await gs('exportBaoCaoTuan', tuan);
+    const result = await gs('exportBaoCaoTuan', tuan);
+    
+    // Decode base64 → Uint8Array → Blob → download trực tiếp (không cần Drive)
+    const byteChars = atob(result.base64);
+    const byteNums = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) {
+      byteNums[i] = byteChars.charCodeAt(i);
+    }
+    const blob = new Blob([byteNums], { type: result.mimeType });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = result.fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    
     const exportResultEl = document.getElementById('exportResult');
     if (exportResultEl) {
-      exportResultEl.innerHTML = `<div class="muted-box"><div><b>✅ Xuất báo cáo thành công</b></div><div style="margin-top:8px"><a href="${url}" target="_blank"><button class="btn-primary">⬇️ Mở file Excel</button></a></div></div>`;
+      exportResultEl.innerHTML = `<div class="muted-box"><b>✅ Xuất thành công!</b> File <b>${result.fileName}</b> đã được tải về máy của bạn.</div>`;
     }
-    showToast('Đã tạo file Excel thành công');
+    showToast('Đã tải file Excel thành công');
   });
 }
 
