@@ -427,9 +427,10 @@ async function renderRankPage(){
     <div class="card">
       <div class="section-head" style="flex-wrap:wrap; gap:12px;">
         <div class="card-title" style="margin:0; width:100%;">🏫 Xếp hạng lớp</div>
-        <div style="display:flex; gap:12px; flex-wrap:wrap; width:100%;">
+        <div style="display:flex; gap:12px; flex-wrap:wrap; width:100%; align-items:flex-end;">
           <div style="flex:1; min-width:150px;"><label>Tuần</label><select id="rankWeek" onchange="loadRankData()"></select></div>
           <div style="flex:1; min-width:150px;"><label>Ca học</label><select id="rankCa" onchange="loadRankData()"><option value="">Tất cả các ca</option><option value="SANG">Ca Sáng</option><option value="CHIEU">Ca Chiều</option></select></div>
+          <div><button class="btn-primary" style="padding:8px 16px; min-height:38px; display:flex; align-items:center; gap:6px;" onclick="exportCurrentRankExcel()">📥 Xuất Excel bảng này</button></div>
         </div>
       </div>
       <div class="table-wrap"><table><thead><tr><th>Hạng</th><th>Khối</th><th>Lớp</th><th>Số HS vi phạm</th><th>Tổng lỗi</th><th>Tổng điểm trừ</th><th>Điểm nề nếp</th><th>SHTT</th><th>ĐHT</th><th>Kết quả thi đua</th></tr></thead><tbody id="rankTable"></tbody></table></div>
@@ -443,6 +444,29 @@ async function renderRankPage(){
     }
   });
 }
+
+async function exportCurrentRankExcel() {
+  const tuan = document.getElementById('rankWeek').value;
+  const ca = document.getElementById('rankCa').value;
+  await safeTask(async () => {
+    const result = await gs('exportXepHangLopExcel', tuan, ca);
+    const byteChars = atob(result.base64);
+    const byteNums = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) {
+      byteNums[i] = byteChars.charCodeAt(i);
+    }
+    const blob = new Blob([byteNums], { type: result.mimeType });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = result.fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    showToast('Đã tải file Excel xếp hạng thành công');
+  });
+}
+
 async function loadRankData(){
   const tuan = document.getElementById('rankWeek').value;
   const ca = document.getElementById('rankCa').value;
@@ -520,10 +544,20 @@ async function loadWeekReportData(){
 async function renderExportPage(){
   document.getElementById('app').innerHTML = `
     <div class="card">
-      <div class="card-title">📥 Xuất Excel</div>
+      <div class="card-title">📥 Xuất Báo Cáo Excel</div>
       <div class="grid-2"><div><label>Chọn tuần</label><select id="exportWeek"></select></div></div>
-      <div class="note">File xuất sẽ gồm 3 sheet: Danh sách vi phạm, Tổng lỗi tuần, Xếp hạng lớp.</div>
-      <div class="btn-row" style="margin-top:14px"><button class="btn-primary" onclick="exportExcelTuan()">📄 Tạo file Excel</button></div>
+      <div class="note" style="margin-top:12px; line-height: 1.6;">
+        <b>Báo cáo tổng hợp tuần</b> sẽ bao gồm <b>5 sheet riêng biệt</b>:
+        <br>1️⃣ <code>01_DANH_SACH_VI_PHAM</code>: Chi tiết tất cả học sinh & lỗi vi phạm trong tuần
+        <br>2️⃣ <code>02_TONG_LOI_TUAN</code>: Thống kê tổng số lỗi vi phạm theo từng học sinh
+        <br>3️⃣ <code>03_XEP_HANG_TOAN_TRUONG</code>: Bảng xếp hạng nề nếp & thi đua toàn trường (10 cột chuẩn)
+        <br>4️⃣ <code>04_XEP_HANG_CA_SANG</code>: Bảng xếp hạng thi đua phân loại riêng Ca Sáng
+        <br>5️⃣ <code>05_XEP_HANG_CA_CHIEU</code>: Bảng xếp hạng thi đua phân loại riêng Ca Chiều
+      </div>
+      <div class="btn-row" style="margin-top:16px; display:flex; gap:12px; flex-wrap:wrap;">
+        <button class="btn-primary" onclick="exportExcelTuan()">📊 Tải Báo cáo tổng hợp tuần (5 Sheet)</button>
+        <button class="btn-secondary" style="background:#059669; color:#fff;" onclick="exportExcelOnlyRank()">🏆 Tải riêng Sheet Xếp Hạng Lớp (.xlsx)</button>
+      </div>
       <div id="exportResult" style="margin-top:16px"></div>
     </div>`;
   await safeTask(async()=>{
@@ -558,7 +592,34 @@ async function exportExcelTuan(){
     if (exportResultEl) {
       exportResultEl.innerHTML = `<div class="muted-box"><b>✅ Xuất thành công!</b> File <b>${result.fileName}</b> đã được tải về máy của bạn.</div>`;
     }
-    showToast('Đã tải file Excel thành công');
+    showToast('Đã tải file Excel tổng hợp thành công');
+  });
+}
+
+async function exportExcelOnlyRank(){
+  const tuan = document.getElementById('exportWeek').value;
+  await safeTask(async()=>{
+    const result = await gs('exportXepHangLopExcel', tuan, '');
+    
+    const byteChars = atob(result.base64);
+    const byteNums = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) {
+      byteNums[i] = byteChars.charCodeAt(i);
+    }
+    const blob = new Blob([byteNums], { type: result.mimeType });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = result.fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    
+    const exportResultEl = document.getElementById('exportResult');
+    if (exportResultEl) {
+      exportResultEl.innerHTML = `<div class="muted-box"><b>✅ Xuất thành công!</b> File bảng xếp hạng lớp <b>${result.fileName}</b> đã được tải về máy của bạn.</div>`;
+    }
+    showToast('Đã tải file Excel xếp hạng lớp thành công');
   });
 }
 
