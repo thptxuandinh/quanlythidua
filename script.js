@@ -740,7 +740,7 @@ async function renderScorePage(){
         <label>Ghi chú lỗi của tuần (tùy chọn)</label>
         <textarea id="sGhiChu" rows="2" placeholder="Nhập ghi chú..."></textarea>
       </div>
-      <button class="btn-primary" style="margin-top:14px" onclick="saveDiemTieuChiFE()">Lưu điểm tiêu chí & Cập nhật xếp hạng</button>
+      <button class="btn-primary" id="btnSaveTieuChi" style="margin-top:14px" onclick="saveDiemTieuChiFE()">Lưu điểm tiêu chí & Cập nhật xếp hạng</button>
       
       <div style="margin-top:20px;">
         <h4 style="margin-bottom:8px;">📊 Dữ liệu điểm tiêu chí các tuần</h4>
@@ -870,79 +870,129 @@ async function saveDiemTieuChiFE() {
   await safeTask(async () => {
     const res = await gs('saveDiemTieuChiTuan', data);
     showToast(res.message);
-    document.getElementById('sHocTot').value = '';
-    document.getElementById('sChuyenCan').value = '';
-    document.getElementById('sDiemTot').value = '';
-    document.getElementById('sDiemXau').value = '';
-    document.getElementById('sDiemTB').value = '';
-    document.getElementById('sGhiChu').value = '';
     await loadDiemTieuChiTable();
     loadRankingTable(tuan);
   });
 }
 
+function fillFormDiemTieuChi(r) {
+  if (document.getElementById('sHocTot')) document.getElementById('sHocTot').value = r.HOC_TOT ?? '';
+  if (document.getElementById('sChuyenCan')) document.getElementById('sChuyenCan').value = r.CHUYEN_CAN ?? '';
+  if (document.getElementById('sDiemTot')) document.getElementById('sDiemTot').value = r.DIEM_TOT ?? '';
+  if (document.getElementById('sDiemXau')) document.getElementById('sDiemXau').value = r.DIEM_XAU ?? '';
+  if (document.getElementById('sDiemTB')) document.getElementById('sDiemTB').value = r.DIEM_TB ?? '';
+  if (document.getElementById('sGhiChu')) document.getElementById('sGhiChu').value = r.GHI_CHU ?? '';
+  
+  const btn = document.getElementById('btnSaveTieuChi');
+  if (btn) btn.textContent = '💾 Cập nhật điểm tiêu chí tuần ' + r.TUAN;
+}
+
+function clearFormDiemTieuChi() {
+  if (document.getElementById('sHocTot')) document.getElementById('sHocTot').value = '';
+  if (document.getElementById('sChuyenCan')) document.getElementById('sChuyenCan').value = '';
+  if (document.getElementById('sDiemTot')) document.getElementById('sDiemTot').value = '';
+  if (document.getElementById('sDiemXau')) document.getElementById('sDiemXau').value = '';
+  if (document.getElementById('sDiemTB')) document.getElementById('sDiemTB').value = '';
+  if (document.getElementById('sGhiChu')) document.getElementById('sGhiChu').value = '';
+  
+  const btn = document.getElementById('btnSaveTieuChi');
+  if (btn) btn.textContent = '💾 Lưu điểm tiêu chí & Cập nhật xếp hạng';
+}
+
+function selectWeekForEdit(tuan) {
+  const sTuan = document.getElementById('sTuan');
+  if (sTuan) {
+    sTuan.value = tuan;
+    loadRankingTable(tuan);
+    loadDiemTieuChiTable();
+  }
+}
+
 async function loadDiemTieuChiTable() {
   const sLopEl = document.getElementById('sLop');
+  const sTuanEl = document.getElementById('sTuan');
   if (!sLopEl) return;
   const lop = sLopEl.value;
+  const tuan = sTuanEl ? sTuanEl.value : '';
   
-  const tableDiemNgayEl = document.getElementById('tableDiemNgay');
-  if (!tableDiemNgayEl) return;
+  const wrap = document.getElementById('diemNgayWrap');
+  const tableEl = document.getElementById('tableDiemNgay');
+  if (!tableEl) return;
 
   if (!lop) {
-    tableDiemNgayEl.innerHTML = '<div style="color:#64748b">Vui lòng chọn lớp.</div>';
+    if (wrap) wrap.style.display = 'none';
+    tableEl.innerHTML = '<div style="color:#64748b">Vui lòng chọn lớp.</div>';
+    clearFormDiemTieuChi();
     return;
   }
-  
+
+  // Tự động hiển thị khung nhập tiêu chí khi đã chọn lớp
+  if (wrap) wrap.style.display = 'block';
+
   await safeTask(async () => {
     const diemList = await gs('getDiemTieuChiTuan', lop);
-    
-    const tableEl = document.getElementById('tableDiemNgay');
-    if (!tableEl) return;
-
     if (!diemList || diemList.length === 0) {
-      tableEl.innerHTML = '<div style="color:#64748b">Chưa có dữ liệu điểm tiêu chí.</div>';
+      tableEl.innerHTML = '<div style="color:#64748b">Chưa có dữ liệu điểm tiêu chí nào cho lớp này.</div>';
+      clearFormDiemTieuChi();
       return;
     }
-    
-    // Sort by TUAN descending
+
+    // Tự động nạp điểm của tuần đang chọn vào các ô input (nếu đã có điểm tuần đó)
+    const currentWeekRecord = diemList.find(x => String(x.TUAN).trim() === String(tuan).trim());
+    if (currentWeekRecord) {
+      fillFormDiemTieuChi(currentWeekRecord);
+    } else {
+      clearFormDiemTieuChi();
+    }
+
+    // Sắp xếp các tuần giảm dần và hiển thị lịch sử
     diemList.sort((a,b) => {
-        const tA = parseInt(String(a.TUAN).replace(/\D/g,'')) || 0;
-        const tB = parseInt(String(b.TUAN).replace(/\D/g,'')) || 0;
-        return tB - tA;
+      const tA = parseInt(String(a.TUAN).replace(/\D/g,'')) || 0;
+      const tB = parseInt(String(b.TUAN).replace(/\D/g,'')) || 0;
+      return tB - tA;
     });
 
-    tableEl.innerHTML = `
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Tuần</th>
-              <th>Điểm TB</th>
-              <th>Ngày Học tốt</th>
-              <th>Ngày Chuyên cần</th>
-              <th>Điểm tốt</th>
-              <th>Điểm xấu</th>
-              <th>Ghi chú</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${diemList.map(x => `
-              <tr>
-                <td class="center bold">${x.TUAN}</td>
-                <td class="right">${x.DIEM_TB || 0}</td>
-                <td class="right">${x.HOC_TOT}</td>
-                <td class="right">${x.CHUYEN_CAN}</td>
-                <td class="right">${x.DIEM_TOT}</td>
-                <td class="right">${x.DIEM_XAU}</td>
-                <td>${escapeHtml(x.GHI_CHU || '')}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    `;
+    tableEl.innerHTML = renderDiemTieuChiHTML(diemList, tuan);
   });
+}
+
+function renderDiemTieuChiHTML(diemList, currentTuan) {
+  return `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Tuần</th>
+            <th>Điểm TB</th>
+            <th>Ngày Học tốt</th>
+            <th>Ngày Chuyên cần</th>
+            <th>Điểm tốt</th>
+            <th>Điểm xấu</th>
+            <th>Ghi chú</th>
+            <th>Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${diemList.map(x => {
+            const isSelected = String(x.TUAN).trim() === String(currentTuan).trim();
+            return `
+            <tr style="${isSelected ? 'background-color:#ecfdf5;font-weight:600;' : ''}">
+              <td class="center bold">${x.TUAN}${isSelected ? ' <span style="color:#059669;font-size:12px;">(Đang chọn)</span>' : ''}</td>
+              <td class="right">${fmtNum(x.DIEM_TB || 0)}</td>
+              <td class="right">${fmtNum(x.HOC_TOT)}</td>
+              <td class="right">${fmtNum(x.CHUYEN_CAN)}</td>
+              <td class="right">${fmtNum(x.DIEM_TOT)}</td>
+              <td class="right">${fmtNum(x.DIEM_XAU)}</td>
+              <td>${escapeHtml(x.GHI_CHU || '')}</td>
+              <td class="center">
+                <button type="button" class="btn-secondary" style="padding:3px 8px;font-size:12px;cursor:pointer;" onclick="selectWeekForEdit('${x.TUAN}')">Xem / Sửa</button>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 
 async function loadScoreDropdownV1258(){
@@ -1003,28 +1053,32 @@ async function deleteScoreV123() {
 }
 
 async function previewNNSHTT() {
-    const tuan = document.getElementById('sTuan').value;
-    const lop = document.getElementById('sLop').value;
-    if (!tuan || !lop) {
-      document.getElementById('previewNN').value = "";
-      document.getElementById('previewSHTT').value = "";
-      return;
-    }
-    document.getElementById('previewNN').value = "Đang tính toán...";
-    document.getElementById('previewSHTT').value = "Đang tính toán...";
-    try {
-      showLoading(true);
-      const res = await gs('getPreviewDiemNNSHTT', tuan, lop);
-      document.getElementById('previewNN').value = "Điểm Nền nếp: " + res.NN;
-      document.getElementById('previewSHTT').value = "Điểm SHTT: " + res.SHTT;
-    } catch(err) {
-      document.getElementById('previewNN').value = "Lỗi!";
-      document.getElementById('previewSHTT').value = "Lỗi!";
-      alert("Lỗi khi tính toán: " + err.message);
-    } finally {
-      showLoading(false);
-    }
+  const pNN = document.getElementById('previewNN');
+  const pSHTT = document.getElementById('previewSHTT');
+  if (!pNN || !pSHTT) return;
+  const sTuanEl = document.getElementById('sTuan');
+  const sLopEl = document.getElementById('sLop');
+  const tuan = sTuanEl ? sTuanEl.value : '';
+  const lop = sLopEl ? sLopEl.value : '';
+  if (!tuan || !lop) {
+    pNN.value = "";
+    pSHTT.value = "";
+    return;
   }
+  pNN.value = "Đang tính toán...";
+  pSHTT.value = "Đang tính toán...";
+  try {
+    showLoading(true);
+    const res = await gs('getPreviewDiemNNSHTT', tuan, lop);
+    pNN.value = "Điểm Nền nếp: " + res.NN;
+    pSHTT.value = "Điểm SHTT: " + res.SHTT;
+  } catch(err) {
+    pNN.value = "Lỗi!";
+    pSHTT.value = "Lỗi!";
+  } finally {
+    showLoading(false);
+  }
+}
 
 async function doLogin() {
     const user = document.getElementById('loginUsername').value;
