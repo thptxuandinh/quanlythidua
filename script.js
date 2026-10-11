@@ -859,29 +859,69 @@ function renderRankTable() {
   }
 }
 
-function exportRankExcel() {
-  if (!window.currentRankData || window.currentRankData.length === 0) {
-    showToast('Không có dữ liệu để xuất', 'error');
+async function exportRankExcel() {
+  const sTuanEl = document.getElementById('sTuan');
+  const tuan = sTuanEl ? sTuanEl.value : '';
+  const caFilterEl = document.getElementById('sCa');
+  const ca = caFilterEl ? caFilterEl.value : '';
+
+  if (!tuan) {
+    showToast('Vui lòng chọn tuần trước khi xuất Excel', 'error');
     return;
   }
-  const caFilterEl = document.getElementById('sCa');
-  const caFilter = caFilterEl ? caFilterEl.value : '';
-  let d = window.currentRankData;
-  if (caFilter) d = d.filter(x => String(x.CA).toUpperCase() === String(caFilter).toUpperCase());
-  
-  d = d.sort((a,b) => {
-    if (b.DIEM_THI_DUA !== a.DIEM_THI_DUA) return b.DIEM_THI_DUA - a.DIEM_THI_DUA;
-    return a.TONG_LOI - b.TONG_LOI;
-  }).map((x,i) => ({...x, HANG: i+1}));
 
-  let csv = 'Hạng,Lớp,ĐHT,NN,SHTT,TĐT\n';
-  d.forEach(x => { csv += `${x.HANG},${x.LOP},${x.DHT},${x.NN},${x.SHTT},${x.DIEM_THI_DUA}\n`; });
-  
-  const blob = new Blob(["\uFEFF"+csv], {type: 'text/csv;charset=utf-8;'});
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = `Xep_Hang_Thi_Dua_${khoi ? 'Khoi_'+khoi : 'Toan_Truong'}.csv`;
-  document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  await safeTask(async () => {
+    try {
+      const result = await gs('exportXepHangLopExcel', tuan, ca);
+      if (result && result.base64) {
+        const byteChars = atob(result.base64);
+        const byteNums = new Uint8Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) {
+          byteNums[i] = byteChars.charCodeAt(i);
+        }
+        const blob = new Blob([byteNums], { type: result.mimeType });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = result.fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+        showToast('Đã tải file Excel xếp hạng thành công');
+        return;
+      }
+    } catch (err) {
+      console.warn('Backend exportXepHangLopExcel chưa sẵn sàng, dùng client export fallback:', err);
+    }
+
+    if (!window.currentRankData || window.currentRankData.length === 0) {
+      showToast('Không có dữ liệu để xuất', 'error');
+      return;
+    }
+    let d = [...window.currentRankData];
+    if (ca) d = d.filter(x => String(x.CA).toUpperCase() === String(ca).toUpperCase());
+    
+    d = d.sort((a,b) => {
+      if (b.DIEM_THI_DUA !== a.DIEM_THI_DUA) return b.DIEM_THI_DUA - a.DIEM_THI_DUA;
+      return (a.TONG_LOI || 0) - (b.TONG_LOI || 0);
+    }).map((x,i) => ({...x, HANG: i+1}));
+
+    let csv = 'Hạng,Lớp,Ca,ĐHT,NN,SHTT,Điểm thi đua\n';
+    d.forEach(x => { 
+      csv += `${x.HANG},"${x.LOP || ''}","${x.CA || ''}",${x.DHT || 0},${x.NN || 0},${x.SHTT || 0},${x.DIEM_THI_DUA || 0}\n`; 
+    });
+    
+    const blob = new Blob(["\uFEFF"+csv], {type: 'text/csv;charset=utf-8;'});
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    const caSuffix = ca === 'SANG' ? 'Ca_Sang' : (ca === 'CHIEU' ? 'Ca_Chieu' : 'Toan_Truong');
+    link.download = `Xep_Hang_Thi_Dua_Tuan_${tuan}_${caSuffix}.csv`;
+    document.body.appendChild(link); 
+    link.click(); 
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+    showToast('Đã tải file xếp hạng thành công');
+  });
 }
 
 // ================= DIEM NGAY LOGIC =================
