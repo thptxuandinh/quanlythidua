@@ -35,6 +35,9 @@ function escapeHtml(v){ return String(v ?? '').replace(/[&<>"']/g, m=>({ '&':'&a
 function fmtNum(v){ const n=Number(v||0); return Number.isInteger(n) ? String(n) : parseFloat(n.toFixed(3)).toString(); }
 function emptyRows(colspan,text='Không có dữ liệu'){ return `<tr><td colspan="${colspan}" class="center empty">${text}</td></tr>`; }
 function todayStr(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function setHtml(id, html){ const el = document.getElementById(id); if (el) el.innerHTML = html; return el; }
+function setText(id, text){ const el = document.getElementById(id); if (el) el.textContent = text; return el; }
+function setVal(id, val){ const el = document.getElementById(id); if (el) el.value = val; return el; }
 
 // Thay thế bằng URL Web App Google Apps Script của bạn (nhớ chọn Anyone)
 const APP_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyNyK_nfSu9xw6JmR9obSMbEI0MP5kkepuv-iBnGybY2Em9mXg0N3MScxpXlqJiq2xL/exec";
@@ -74,17 +77,20 @@ async function gs(method, ...args) {
     }
   }
 
-  // Write methods: do NOT retry to avoid duplicate records
+  // Write methods & Export methods: do NOT retry to avoid duplicate operations or concurrency conflicts
   const WRITE_METHODS = ['saveViPham', 'saveDiemTieuChiTuan', 'saveDiemHocTapV123', 'luuDiemHocTap', 'themHocSinh', 'themLop', 'themLoiViPham', 'taoTaiKhoan', 'saveSapXepLop'];
   const isWrite = WRITE_METHODS.includes(method);
-  const MAX_RETRIES = isWrite ? 1 : 3;
+  const isExport = typeof method === 'string' && method.startsWith('export');
+  const MAX_RETRIES = (isWrite || isExport) ? 1 : 3;
 
   const payload = JSON.stringify({ method, args });
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      // Các thao tác xuất file Excel 5 sheet cần thời gian tới 60s
+      const timeoutMs = isExport ? 60000 : 30000;
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       const res = await fetch(APP_SCRIPT_URL, {
         method: "POST",
@@ -160,7 +166,13 @@ async function safeTask(task){
     await task(); 
   } catch(err){ 
     console.error('[safeTask]', err); 
-    showToast(err.message || String(err),'error'); 
+    const msg = String(err && err.message ? err.message : err);
+    // Bỏ qua lỗi DOM null khi người dùng chuyển trang giữa chừng lúc đang tải dữ liệu
+    if (msg.includes("Cannot set properties of null") || msg.includes("Cannot read properties of null") || msg.includes("null is not an object")) {
+      console.warn('[safeTask] DOM element unmounted during navigation, safe ignore.');
+      return;
+    }
+    showToast(msg || 'Có lỗi xảy ra', 'error'); 
   } finally { 
     showLoading(false); 
   } 
@@ -220,7 +232,7 @@ async function renderDashboardPage(){
     </div>`;
   await safeTask(async()=>{
     const weeks = await gs('getDanhSachTuan');
-    document.getElementById('dashboardWeek').innerHTML = weeks.map(x=>`<option value="${x.value}" ${x.current?'selected':''}>${escapeHtml(x.label)}</option>`).join('');
+    setHtml('dashboardWeek', weeks.map(x=>`<option value="${x.value}" ${x.current?'selected':''}>${escapeHtml(x.label)}</option>`).join(''));
     await loadDashboardData();
   });
 }
@@ -242,17 +254,15 @@ async function loadDashboardData(){
       dash = await gs('getDashboardTuan', tuan);
       thongKe = await gs('getThongKeNhomLoi', tuan);
     }
-    const elTongLoi = document.getElementById('dashTongLoi');
-    if (elTongLoi) {
-      elTongLoi.textContent = fmtNum(dash.TONG_LOI);
-      document.getElementById('dashTongDiem').textContent = fmtNum(dash.TONG_DIEM_TRU);
-      document.getElementById('dashSoHS').textContent = fmtNum(dash.SO_HOC_SINH);
-      document.getElementById('dashSoLop').textContent = fmtNum(dash.SO_LOP);
-      const nhomRows = Object.keys(thongKe).length ? Object.keys(thongKe).map(k=>`<tr><td>${escapeHtml(k)}</td><td class="center">${fmtNum(thongKe[k])}</td></tr>`).join('') : emptyRows(2);
-      document.getElementById('dashNhomLoi').innerHTML = nhomRows;
-      const top = dash.TOP_LOP || [];
-      document.getElementById('dashTopLop').innerHTML = top.length ? top.map(x=>`<tr><td class="center">${fmtNum(x.XEP_HANG)}</td><td class="center bold">${escapeHtml(x.LOP)}</td><td class="center">${fmtNum(x.TONG_LOI)}</td><td class="right">${fmtNum(x.DIEM_THI_DUA)}</td></tr>`).join('') : emptyRows(4);
-    }
+    if (!document.getElementById('dashTongLoi')) return;
+    setText('dashTongLoi', fmtNum(dash.TONG_LOI));
+    setText('dashTongDiem', fmtNum(dash.TONG_DIEM_TRU));
+    setText('dashSoHS', fmtNum(dash.SO_HOC_SINH));
+    setText('dashSoLop', fmtNum(dash.SO_LOP));
+    const nhomRows = Object.keys(thongKe).length ? Object.keys(thongKe).map(k=>`<tr><td>${escapeHtml(k)}</td><td class="center">${fmtNum(thongKe[k])}</td></tr>`).join('') : emptyRows(2);
+    setHtml('dashNhomLoi', nhomRows);
+    const top = dash.TOP_LOP || [];
+    setHtml('dashTopLop', top.length ? top.map(x=>`<tr><td class="center">${fmtNum(x.XEP_HANG)}</td><td class="center bold">${escapeHtml(x.LOP)}</td><td class="center">${fmtNum(x.TONG_LOI)}</td><td class="right">${fmtNum(x.DIEM_THI_DUA)}</td></tr>`).join('') : emptyRows(4));
   });
 }
 
@@ -295,70 +305,78 @@ async function renderFormPage(){
       nhomList = await gs('getNhomLoi');
     }
       
-    document.getElementById('khoi').innerHTML = `<option value="">-- Chọn khối --</option>` + 
-      khoiList.map(x => `<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
+    setHtml('khoi', `<option value="">-- Chọn khối --</option>` + 
+      khoiList.map(x => `<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join(''));
         
-    document.getElementById('nhomLoi').innerHTML = `<option value="">-- Chọn nhóm lỗi --</option>` + 
-      nhomList.map(x => `<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
+    setHtml('nhomLoi', `<option value="">-- Chọn nhóm lỗi --</option>` + 
+      nhomList.map(x => `<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join(''));
 
-    document.getElementById('lop').innerHTML = `<option value="">-- Chọn lớp --</option>`;
-    document.getElementById('hocSinh').innerHTML = `<option value="">-- Chọn học sinh --</option>`;
-    document.getElementById('maLoi').innerHTML = `<option value="">-- Chọn lỗi --</option>`;
+    setHtml('lop', `<option value="">-- Chọn lớp --</option>`);
+    setHtml('hocSinh', `<option value="">-- Chọn học sinh --</option>`);
+    setHtml('maLoi', `<option value="">-- Chọn lỗi --</option>`);
   });
 }
 function resetFormViPham(){ 
   autoFillActualScore=true; 
   currentBaseScore=0; 
   if (currentPage !== 'form' || !document.getElementById('ngayVP')) return;
-  document.getElementById('ngayVP').value = todayStr();
-  document.getElementById('khoi').value = '';
-  document.getElementById('lop').innerHTML = '<option value="">-- Chọn lớp --</option>';
-  document.getElementById('hocSinh').innerHTML = '<option value="">-- Chọn học sinh --</option>';
-  document.getElementById('nhomLoi').value = '';
-  document.getElementById('maLoi').innerHTML = '<option value="">-- Lỗi vi phạm --</option>';
-  document.getElementById('diemGoc').value = '';
-  document.getElementById('soLan').value = '1';
-  document.getElementById('diemTru').value = '';
-  document.getElementById('ghiChu').value = '';
+  setVal('ngayVP', todayStr());
+  setVal('khoi', '');
+  setHtml('lop', '<option value="">-- Chọn lớp --</option>');
+  setHtml('hocSinh', '<option value="">-- Chọn học sinh --</option>');
+  setVal('nhomLoi', '');
+  setHtml('maLoi', '<option value="">-- Lỗi vi phạm --</option>');
+  setVal('diemGoc', '');
+  setVal('soLan', '1');
+  setVal('diemTru', '');
+  setVal('ghiChu', '');
 }
 async function changeKhoi(){
-  const khoi = document.getElementById('khoi').value;
-  document.getElementById('lop').innerHTML = `<option value="">-- Chọn lớp --</option>`;
-  document.getElementById('hocSinh').innerHTML = `<option value="">-- Chọn học sinh --</option>`;
+  const khoiEl = document.getElementById('khoi');
+  if(!khoiEl) return;
+  const khoi = khoiEl.value;
+  setHtml('lop', `<option value="">-- Chọn lớp --</option>`);
+  setHtml('hocSinh', `<option value="">-- Chọn học sinh --</option>`);
   if(!khoi) return;
   await safeTask(async()=>{
     const lopList = await gs('getLopTheoKhoi', khoi);
-    document.getElementById('lop').innerHTML = `<option value="">-- Chọn lớp --</option>` + lopList.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join('');
+    setHtml('lop', `<option value="">-- Chọn lớp --</option>` + lopList.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`).join(''));
   });
 }
 async function changeLop(){
-  const lop = document.getElementById('lop').value;
-  document.getElementById('hocSinh').innerHTML = `<option value="">-- Chọn học sinh --</option>`;
+  const lopEl = document.getElementById('lop');
+  if(!lopEl) return;
+  const lop = lopEl.value;
+  setHtml('hocSinh', `<option value="">-- Chọn học sinh --</option>`);
   if(!lop) return;
   await safeTask(async()=>{
     const hsList = await gs('getHocSinhTheoLop', lop);
-    document.getElementById('hocSinh').innerHTML = `<option value="">-- Chọn học sinh --</option>` + hsList.map(x=>`<option value="${escapeHtml(x.ID_HS)}">${escapeHtml(x.HO_TEN)}</option>`).join('');
+    setHtml('hocSinh', `<option value="">-- Chọn học sinh --</option>` + hsList.map(x=>`<option value="${escapeHtml(x.ID_HS)}">${escapeHtml(x.HO_TEN)}</option>`).join(''));
   });
 }
 async function changeNhomLoi(){
-  const nhom = document.getElementById('nhomLoi').value;
-  document.getElementById('maLoi').innerHTML = `<option value="">-- Chọn lỗi --</option>`;
-  document.getElementById('diemGoc').value = '';
-  document.getElementById('diemTru').value = '';
+  const nhomEl = document.getElementById('nhomLoi');
+  if(!nhomEl) return;
+  const nhom = nhomEl.value;
+  setHtml('maLoi', `<option value="">-- Chọn lỗi --</option>`);
+  setVal('diemGoc', '');
+  setVal('diemTru', '');
   currentBaseScore = 0;
   if(!nhom) return;
   await safeTask(async()=>{
     const list = await gs('getLoiTheoNhom', nhom);
-    document.getElementById('maLoi').innerHTML = `<option value="">-- Chọn lỗi --</option>` + list.map(x=>`<option value="${escapeHtml(x.maLoi)}" data-diem="${x.diemTru ?? x.diem ?? 0}">${escapeHtml(x.tenLoi)}</option>`).join('');
+    setHtml('maLoi', `<option value="">-- Chọn lỗi --</option>` + list.map(x=>`<option value="${escapeHtml(x.maLoi)}" data-diem="${x.diemTru ?? x.diem ?? 0}">${escapeHtml(x.tenLoi)}</option>`).join(''));
   });
 }
 async function changeLoi(){
-  const ma = document.getElementById('maLoi').value;
-  if(!ma){ currentBaseScore=0; document.getElementById('diemGoc').value=''; document.getElementById('diemTru').value=''; return; }
+  const maEl = document.getElementById('maLoi');
+  if(!maEl) return;
+  const ma = maEl.value;
+  if(!ma){ currentBaseScore=0; setVal('diemGoc', ''); setVal('diemTru', ''); return; }
   await safeTask(async()=>{
     const data = await gs('getThongTinLoi', ma);
     currentBaseScore = Number(data.diemTru ?? data.diem ?? 0);
-    document.getElementById('diemGoc').value = fmtNum(currentBaseScore);
+    setVal('diemGoc', fmtNum(currentBaseScore));
     autoFillActualScore = true;
     recalcActualScore();
   });
@@ -405,7 +423,7 @@ async function renderStudentPage(){
     </div>`;
   await safeTask(async()=>{
     const weeks = await gs('getDanhSachTuan');
-    document.getElementById('studentWeek').innerHTML = weeks.map(x=>`<option value="${x.value}" ${x.current?'selected':''}>${escapeHtml(x.label)}</option>`).join('');
+    setHtml('studentWeek', weeks.map(x=>`<option value="${x.value}" ${x.current?'selected':''}>${escapeHtml(x.label)}</option>`).join(''));
     await loadStudentData();
   });
 }
@@ -415,10 +433,7 @@ async function loadStudentData(){
   const tuan = weekEl.value;
   await safeTask(async()=>{
     const data = await gs('getTongHopHocSinh', tuan);
-    const tableEl = document.getElementById('studentTable');
-    if (tableEl) {
-      tableEl.innerHTML = data.length ? data.map(x=>`<tr><td class="center">${escapeHtml(x.KHOI)}</td><td class="center bold">${escapeHtml(x.LOP)}</td><td>${escapeHtml(x.HO_TEN)}</td><td class="center">${fmtNum(x.CHUYEN_CAN)}</td><td class="center">${fmtNum(x.TRANG_PHUC)}</td><td class="center">${fmtNum(x.GIAO_THONG)}</td><td class="center">${fmtNum(x.CSVC)}</td><td class="center">${fmtNum(x.SINH_HOAT_TAP_THE)}</td><td class="center">${fmtNum(x.VI_PHAM_KHAC)}</td><td class="center">${fmtNum(x.TONG_LOI)}</td><td class="right">${fmtNum(x.TONG_DIEM_TRU)}</td><td class="center"><button class="btn-secondary" onclick="openStudentViolation('${x.ID_HS}','${escapeHtml(x.HO_TEN)}')">Xem lỗi</button></td></tr>`).join('') : emptyRows(12);
-    }
+    setHtml('studentTable', data.length ? data.map(x=>`<tr><td class="center">${escapeHtml(x.KHOI)}</td><td class="center bold">${escapeHtml(x.LOP)}</td><td>${escapeHtml(x.HO_TEN)}</td><td class="center">${fmtNum(x.CHUYEN_CAN)}</td><td class="center">${fmtNum(x.TRANG_PHUC)}</td><td class="center">${fmtNum(x.GIAO_THONG)}</td><td class="center">${fmtNum(x.CSVC)}</td><td class="center">${fmtNum(x.SINH_HOAT_TAP_THE)}</td><td class="center">${fmtNum(x.VI_PHAM_KHAC)}</td><td class="center">${fmtNum(x.TONG_LOI)}</td><td class="right">${fmtNum(x.TONG_DIEM_TRU)}</td><td class="center"><button class="btn-secondary" onclick="openStudentViolation('${x.ID_HS}','${escapeHtml(x.HO_TEN)}')">Xem lỗi</button></td></tr>`).join('') : emptyRows(12));
   });
 }
 
@@ -506,7 +521,9 @@ async function renderWeekPage(){
   });
 }
 async function loadWeekReportData(){
-  const tuan = document.getElementById('reportWeek').value;
+  const reportWeekEl = document.getElementById('reportWeek');
+  if (!reportWeekEl) return;
+  const tuan = reportWeekEl.value;
   await safeTask(async()=>{
     let data = await gs('getDanhSachViPhamTheoTuan', tuan);
     
@@ -537,7 +554,7 @@ async function loadWeekReportData(){
       return lopA.localeCompare(lopB, undefined, { numeric: true, sensitivity: 'base' });
     });
 
-    document.getElementById('reportTable').innerHTML = data.length ? data.map(x=>`<tr><td class="center">${escapeHtml(x.NGAY_VP)}</td><td class="center">${escapeHtml(x.KHOI)}</td><td class="center bold">${escapeHtml(x.LOP)}</td><td>${escapeHtml(x.HO_TEN)}</td><td class="center">${escapeHtml(x.NHOM_LOI)}</td><td>${escapeHtml(x.TEN_LOI || x.tenLoi || '')}</td><td class="center">${fmtNum(x.SO_LAN || 1)}</td><td class="right">${fmtNum(x.DIEM_TRU || x.diemTru || 0)}</td><td>${escapeHtml(x.GHI_CHU || '')}</td></tr>`).join('') : emptyRows(9);
+    setHtml('reportTable', data.length ? data.map(x=>`<tr><td class="center">${escapeHtml(x.NGAY_VP)}</td><td class="center">${escapeHtml(x.KHOI)}</td><td class="center bold">${escapeHtml(x.LOP)}</td><td>${escapeHtml(x.HO_TEN)}</td><td class="center">${escapeHtml(x.NHOM_LOI)}</td><td>${escapeHtml(x.TEN_LOI || x.tenLoi || '')}</td><td class="center">${fmtNum(x.SO_LAN || 1)}</td><td class="right">${fmtNum(x.DIEM_TRU || x.diemTru || 0)}</td><td>${escapeHtml(x.GHI_CHU || '')}</td></tr>`).join('') : emptyRows(9));
   });
 }
 
@@ -555,8 +572,8 @@ async function renderExportPage(){
         <br>5️⃣ <code>05_XEP_HANG_CA_CHIEU</code>: Bảng xếp hạng thi đua phân loại riêng Ca Chiều
       </div>
       <div class="btn-row" style="margin-top:16px; display:flex; gap:12px; flex-wrap:wrap;">
-        <button class="btn-primary" onclick="exportExcelTuan()">📊 Tải Báo cáo tổng hợp tuần (5 Sheet)</button>
-        <button class="btn-secondary" style="background:#059669; color:#fff;" onclick="exportExcelOnlyRank()">🏆 Tải riêng Sheet Xếp Hạng Lớp (.xlsx)</button>
+        <button id="btnExportFull" class="btn-primary" onclick="exportExcelTuan()">📊 Tải Báo cáo tổng hợp tuần (5 Sheet)</button>
+        <button id="btnExportRankOnly" class="btn-secondary" style="background:#059669; color:#fff;" onclick="exportExcelOnlyRank()">🏆 Tải riêng Sheet Xếp Hạng Lớp (.xlsx)</button>
       </div>
       <div id="exportResult" style="margin-top:16px"></div>
     </div>`;
@@ -568,59 +585,108 @@ async function renderExportPage(){
     }
   });
 }
+
+let _isExporting = false;
+
 async function exportExcelTuan(){
-  const tuan = document.getElementById('exportWeek').value;
-  await safeTask(async()=>{
-    const result = await gs('exportBaoCaoTuan', tuan);
-    
-    // Decode base64 → Uint8Array → Blob → download trực tiếp (không cần Drive)
-    const byteChars = atob(result.base64);
-    const byteNums = new Uint8Array(byteChars.length);
-    for (let i = 0; i < byteChars.length; i++) {
-      byteNums[i] = byteChars.charCodeAt(i);
+  if (_isExporting) {
+    showToast('Đang tạo file Excel, vui lòng đợi trong giây lát...', 'warning');
+    return;
+  }
+  const tuanEl = document.getElementById('exportWeek');
+  if (!tuanEl) return;
+  const tuan = tuanEl.value;
+  const btn = document.getElementById('btnExportFull');
+  const origText = btn ? btn.innerHTML : '';
+  
+  _isExporting = true;
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Đang tạo file 5 sheet (khoảng 10-15s)...';
+  }
+
+  try {
+    await safeTask(async()=>{
+      const result = await gs('exportBaoCaoTuan', tuan);
+      
+      // Decode base64 → Uint8Array → Blob → download trực tiếp (không cần Drive)
+      const byteChars = atob(result.base64);
+      const byteNums = new Uint8Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) {
+        byteNums[i] = byteChars.charCodeAt(i);
+      }
+      const blob = new Blob([byteNums], { type: result.mimeType });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = result.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+      
+      const exportResultEl = document.getElementById('exportResult');
+      if (exportResultEl) {
+        exportResultEl.innerHTML = `<div class="muted-box"><b>✅ Xuất thành công!</b> File <b>${result.fileName}</b> đã được tải về máy của bạn.</div>`;
+      }
+      showToast('Đã tải file Excel tổng hợp 5 sheet thành công');
+    });
+  } finally {
+    _isExporting = false;
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origText;
     }
-    const blob = new Blob([byteNums], { type: result.mimeType });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = result.fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
-    
-    const exportResultEl = document.getElementById('exportResult');
-    if (exportResultEl) {
-      exportResultEl.innerHTML = `<div class="muted-box"><b>✅ Xuất thành công!</b> File <b>${result.fileName}</b> đã được tải về máy của bạn.</div>`;
-    }
-    showToast('Đã tải file Excel tổng hợp thành công');
-  });
+  }
 }
 
 async function exportExcelOnlyRank(){
-  const tuan = document.getElementById('exportWeek').value;
-  await safeTask(async()=>{
-    const result = await gs('exportXepHangLopExcel', tuan, '');
-    
-    const byteChars = atob(result.base64);
-    const byteNums = new Uint8Array(byteChars.length);
-    for (let i = 0; i < byteChars.length; i++) {
-      byteNums[i] = byteChars.charCodeAt(i);
+  if (_isExporting) {
+    showToast('Đang tạo file Excel, vui lòng đợi trong giây lát...', 'warning');
+    return;
+  }
+  const tuanEl = document.getElementById('exportWeek');
+  if (!tuanEl) return;
+  const tuan = tuanEl.value;
+  const btn = document.getElementById('btnExportRankOnly');
+  const origText = btn ? btn.innerHTML : '';
+
+  _isExporting = true;
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Đang tạo file xếp hạng...';
+  }
+
+  try {
+    await safeTask(async()=>{
+      const result = await gs('exportXepHangLopExcel', tuan, '');
+      
+      const byteChars = atob(result.base64);
+      const byteNums = new Uint8Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) {
+        byteNums[i] = byteChars.charCodeAt(i);
+      }
+      const blob = new Blob([byteNums], { type: result.mimeType });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = result.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+      
+      const exportResultEl = document.getElementById('exportResult');
+      if (exportResultEl) {
+        exportResultEl.innerHTML = `<div class="muted-box"><b>✅ Xuất thành công!</b> File bảng xếp hạng lớp <b>${result.fileName}</b> đã được tải về máy của bạn.</div>`;
+      }
+      showToast('Đã tải file Excel xếp hạng lớp thành công');
+    });
+  } finally {
+    _isExporting = false;
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origText;
     }
-    const blob = new Blob([byteNums], { type: result.mimeType });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = result.fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
-    
-    const exportResultEl = document.getElementById('exportResult');
-    if (exportResultEl) {
-      exportResultEl.innerHTML = `<div class="muted-box"><b>✅ Xuất thành công!</b> File bảng xếp hạng lớp <b>${result.fileName}</b> đã được tải về máy của bạn.</div>`;
-    }
-    showToast('Đã tải file Excel xếp hạng lớp thành công');
-  });
+  }
 }
 
 async function renderAdminPage(){
@@ -927,18 +993,21 @@ async function exportRankExcel() {
 // ================= DIEM NGAY LOGIC =================
 
 async function loadLopTheoCaUI() {
-  const ca = document.getElementById('sCa').value;
+  const sCaEl = document.getElementById('sCa');
+  if (!sCaEl) return;
+  const ca = sCaEl.value;
   const wrap = document.getElementById('diemNgayWrap');
   if (!ca) {
-    document.getElementById('sLop').innerHTML = '<option value="">-- Chọn lớp --</option>';
-    wrap.style.display = 'none';
+    setHtml('sLop', '<option value="">-- Chọn lớp --</option>');
+    if (wrap) wrap.style.display = 'none';
     return;
   }
   await safeTask(async () => {
     const lops = await gs('getLopTheoCa', ca);
-    document.getElementById('sLop').innerHTML = '<option value="">-- Chọn lớp --</option>' + 
-      lops.map(x => `<option>${x}</option>`).join('');
-    wrap.style.display = 'block';
+    setHtml('sLop', '<option value="">-- Chọn lớp --</option>' + 
+      lops.map(x => `<option>${x}</option>`).join(''));
+    const w = document.getElementById('diemNgayWrap');
+    if (w) w.style.display = 'block';
   });
 }
 
