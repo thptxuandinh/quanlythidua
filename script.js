@@ -857,11 +857,21 @@ async function renderScorePage(){
     <div id="diemNgayWrap" style="margin-top:16px; display:none; padding:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;">
       <div class="sub-title" style="margin-bottom:12px;">📝 Nhập điểm tiêu chí tuần</div>
       <div class="grid-2">
-        <div><label>Ngày học tốt (Max 5)</label><input type="number" id="sHocTot" max="5" placeholder="Nhập điểm số"></div>
-        <div><label>Ngày chuyên cần (Max 5)</label><input type="number" id="sChuyenCan" max="5" placeholder="Nhập điểm số"></div>
-        <div><label>Điểm tốt (Max 20)</label><input type="number" id="sDiemTot" max="20" placeholder="Nhập điểm số"></div>
-        <div><label>Điểm xấu</label><input type="number" id="sDiemXau" placeholder="Nhập điểm số"></div>
-        <div><label>Điểm trung bình</label><input type="number" id="sDiemTB" placeholder="Nhập điểm số"></div>
+        <div><label>Ngày học tốt (Max 5)</label><input type="number" id="sHocTot" max="5" placeholder="Nhập điểm số" oninput="calcPreviewDHT()"></div>
+        <div><label>Ngày chuyên cần (Max 5)</label><input type="number" id="sChuyenCan" max="5" placeholder="Nhập điểm số" oninput="calcPreviewDHT()"></div>
+        <div><label>Điểm tốt (Max 20)</label><input type="number" id="sDiemTot" max="20" placeholder="Nhập điểm số" oninput="calcPreviewDHT()"></div>
+        <div><label>Điểm xấu</label><input type="number" id="sDiemXau" placeholder="Nhập điểm số" oninput="calcPreviewDHT()"></div>
+        <div><label>Điểm trung bình</label><input type="number" id="sDiemTB" placeholder="Nhập điểm số" oninput="calcPreviewDHT()"></div>
+      </div>
+      <div id="dhtPreviewBox" style="margin-top:12px;padding:12px 14px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;font-size:14px;color:#065f46;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <div>
+          <strong>💡 Dự tính Điểm Học Tập (ĐHT):</strong> 
+          <span id="previewDHTVal" style="font-size:18px;font-weight:800;color:#047857;margin-left:6px;">0.00</span>
+          <span style="font-size:13px;color:#059669;"> / 10.0</span>
+        </div>
+        <div id="previewDHTFormula" style="font-size:12px;color:#047857;font-style:italic;">
+          Công thức: (TB×7.5 + ĐTX + NHT + NCC×0.5) / 10
+        </div>
       </div>
       <div style="margin-top:12px;">
         <label>Ghi chú lỗi của tuần (tùy chọn)</label>
@@ -1045,6 +1055,50 @@ async function saveDiemTieuChiFE() {
   });
 }
 
+function calcDHTFromObj(x) {
+  const dtb = Number(x.DIEM_TB || 0);
+  const dTot = Number(x.DIEM_TOT || 0);
+  const dXau = Number(x.DIEM_XAU || 0);
+  const ht = Number(x.HOC_TOT || 0);
+  const cc = Number(x.CHUYEN_CAN || 0);
+
+  const ktm = Math.max(-20, Math.min(20, dTot - dXau));
+  const dtx = (ktm / 20) * 10;
+  const nhtDays = Math.max(0, Math.min(5, ht));
+  const nht = (nhtDays / 5) * 10;
+  const nccDays = Math.max(0, Math.min(5, cc));
+  const ncc = (nccDays / 5) * 10;
+
+  const sum100 = (dtb * 7.5) + dtx + nht + (ncc * 0.5);
+  return Math.round((Math.min(10, Math.max(0, sum100 / 10)) + Number.EPSILON) * 100) / 100;
+}
+
+function calcPreviewDHT() {
+  const dtb = parseFloat(document.getElementById('sDiemTB')?.value || 0) || 0;
+  const dTot = parseFloat(document.getElementById('sDiemTot')?.value || 0) || 0;
+  const dXau = parseFloat(document.getElementById('sDiemXau')?.value || 0) || 0;
+  const ht = parseFloat(document.getElementById('sHocTot')?.value || 0) || 0;
+  const cc = parseFloat(document.getElementById('sChuyenCan')?.value || 0) || 0;
+
+  const ktm = Math.max(-20, Math.min(20, dTot - dXau));
+  const dtx = (ktm / 20) * 10;
+  const nhtDays = Math.max(0, Math.min(5, ht));
+  const nht = (nhtDays / 5) * 10;
+  const nccDays = Math.max(0, Math.min(5, cc));
+  const ncc = (nccDays / 5) * 10;
+
+  const sum100 = (dtb * 7.5) + dtx + nht + (ncc * 0.5);
+  const dht = Math.round((Math.min(10, Math.max(0, sum100 / 10)) + Number.EPSILON) * 100) / 100;
+
+  const previewVal = document.getElementById('previewDHTVal');
+  const previewFormula = document.getElementById('previewDHTFormula');
+  if (previewVal) previewVal.textContent = dht.toFixed(2);
+  if (previewFormula) {
+    const dtxSign = dtx >= 0 ? '+' : '';
+    previewFormula.textContent = `Chi tiết: (${dtb}×7.5 + ĐTX ${dtxSign}${dtx.toFixed(1)} + NHT ${nht.toFixed(1)} + NCC×0.5 ${(ncc*0.5).toFixed(1)}) / 10 = ${dht.toFixed(2)}`;
+  }
+}
+
 function fillFormDiemTieuChi(r) {
   if (document.getElementById('sHocTot')) document.getElementById('sHocTot').value = r.HOC_TOT ?? '';
   if (document.getElementById('sChuyenCan')) document.getElementById('sChuyenCan').value = r.CHUYEN_CAN ?? '';
@@ -1055,6 +1109,7 @@ function fillFormDiemTieuChi(r) {
   
   const btn = document.getElementById('btnSaveTieuChi');
   if (btn) btn.textContent = '💾 Cập nhật điểm tiêu chí tuần ' + r.TUAN;
+  calcPreviewDHT();
 }
 
 function clearFormDiemTieuChi() {
@@ -1067,6 +1122,7 @@ function clearFormDiemTieuChi() {
   
   const btn = document.getElementById('btnSaveTieuChi');
   if (btn) btn.textContent = '💾 Lưu điểm tiêu chí & Cập nhật xếp hạng';
+  calcPreviewDHT();
 }
 
 function selectWeekForEdit(tuan) {
@@ -1134,10 +1190,11 @@ function renderDiemTieuChiHTML(diemList, currentTuan) {
           <tr>
             <th>Tuần</th>
             <th>Điểm TB</th>
-            <th>Ngày Học tốt</th>
-            <th>Ngày Chuyên cần</th>
+            <th>Học tốt</th>
+            <th>Chuyên cần</th>
             <th>Điểm tốt</th>
             <th>Điểm xấu</th>
+            <th>ĐHT</th>
             <th>Ghi chú</th>
             <th>Thao tác</th>
           </tr>
@@ -1145,6 +1202,7 @@ function renderDiemTieuChiHTML(diemList, currentTuan) {
         <tbody>
           ${diemList.map(x => {
             const isSelected = String(x.TUAN).trim() === String(currentTuan).trim();
+            const dht = x.DHT !== undefined ? Number(x.DHT) : calcDHTFromObj(x);
             return `
             <tr style="${isSelected ? 'background-color:#ecfdf5;font-weight:600;' : ''}">
               <td class="center bold">${x.TUAN}${isSelected ? ' <span style="color:#059669;font-size:12px;">(Đang chọn)</span>' : ''}</td>
@@ -1153,6 +1211,7 @@ function renderDiemTieuChiHTML(diemList, currentTuan) {
               <td class="right">${fmtNum(x.CHUYEN_CAN)}</td>
               <td class="right">${fmtNum(x.DIEM_TOT)}</td>
               <td class="right">${fmtNum(x.DIEM_XAU)}</td>
+              <td class="right bold" style="color:#047857;">${fmtNum(dht)}</td>
               <td>${escapeHtml(x.GHI_CHU || '')}</td>
               <td class="center">
                 <button type="button" class="btn-secondary" style="padding:3px 8px;font-size:12px;cursor:pointer;" onclick="selectWeekForEdit('${x.TUAN}')">Xem / Sửa</button>
